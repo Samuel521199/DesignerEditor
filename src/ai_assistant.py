@@ -17,22 +17,37 @@ class AIResponseThread(QThread):
         self.prompt = prompt
 
     def run(self):
-        try:
-            if self.api_type == "gemini":
-                response = self.call_gemini()
-            else:
-                response = self.call_chatgpt()
-            self.response_received.emit(response)
-        except Exception as e:
-            self.error_occurred.emit(str(e))
+        MAX_RETRIES = 3
+        retry_count = 0
+        last_error = None
+        
+        while retry_count < MAX_RETRIES:
+            try:
+                if self.api_type == "gemini":
+                    response = self.call_gemini()
+                else:
+                    response = self.call_chatgpt()
+                self.response_received.emit(response)
+                return
+            except Exception as e:
+                last_error = e
+                retry_count += 1
+                if retry_count < MAX_RETRIES:
+                    print(f"API调用失败，正在进行第{retry_count}次重试...")
+                    self.msleep(2000)  # 等待2秒后重试
+                
+        self.error_occurred.emit(str(last_error))
 
     def call_gemini(self):
-        api_key = os.getenv('GEMINI_API_KEY')
+        api_key = os.environ.get('GEMINI_API_KEY')
         if not api_key:
             raise Exception("GEMINI_API_KEY 环境变量未设置")
             
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
-        headers = {'Content-Type': 'application/json'}
+        headers = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
         data = {
             "contents": [{
                 "parts": [{
@@ -40,18 +55,29 @@ class AIResponseThread(QThread):
                 }]
             }]
         }
-        response = requests.post(url, headers=headers, json=data)
-        return response.json()['candidates'][0]['content']['parts'][0]['text']
+        
+        try:
+            response = requests.post(url, headers=headers, json=data, timeout=30)
+            if response.status_code != 200:
+                raise Exception(f"API调用失败: {response.text}")
+            return response.json()['candidates'][0]['content']['parts'][0]['text']
+        except requests.exceptions.Timeout:
+            raise Exception("请求超时，请检查网络连接")
+        except requests.exceptions.ConnectionError as e:
+            raise Exception(f"网络连接错误，请检查网络设置: {str(e)}")
+        except Exception as e:
+            raise Exception(f"请求失败: {str(e)}")
 
     def call_chatgpt(self):
-        api_key = os.getenv('CHATGPT_API_KEY')
+        api_key = os.environ.get('CHATGPT_API_KEY')
         if not api_key:
             raise Exception("CHATGPT_API_KEY 环境变量未设置")
             
         url = "https://api.openai.com/v1/chat/completions"
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}"
+            "Authorization": f"Bearer {api_key}",
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
         data = {
             "model": "gpt-4",
@@ -59,8 +85,18 @@ class AIResponseThread(QThread):
                 {"role": "user", "content": self.prompt}
             ]
         }
-        response = requests.post(url, headers=headers, json=data)
-        return response.json()['choices'][0]['message']['content']
+        
+        try:
+            response = requests.post(url, headers=headers, json=data, timeout=30)
+            if response.status_code != 200:
+                raise Exception(f"API调用失败: {response.text}")
+            return response.json()['choices'][0]['message']['content']
+        except requests.exceptions.Timeout:
+            raise Exception("请求超时，请检查网络连接")
+        except requests.exceptions.ConnectionError as e:
+            raise Exception(f"网络连接错误，请检查网络设置: {str(e)}")
+        except Exception as e:
+            raise Exception(f"请求失败: {str(e)}")
 
 class AIAssistantPanel(QWidget):
     def __init__(self):
@@ -161,26 +197,42 @@ class AIAssistantPanel(QWidget):
 
     def check_api_keys(self):
         try:
-            # 获取应用程序的基础路径
-            if getattr(sys, 'frozen', False):
-                # 如果是打包后的可执行文件
-                base_path = os.path.dirname(sys.executable)
-            else:
-                # 如果是开发环境
-                base_path = os.path.dirname(os.path.abspath(__file__))
+            # 优先从系统环境变量获取API密钥
+            gemini_key = os.environ.get('GEMINI_API_KEY')
+            chatgpt_key = os.environ.get('CHATGPT_API_KEY')
             
-            # 加载环境变量
-            env_path = os.path.join(base_path, '.env')
-            if os.path.exists(env_path):
-                print(f"Loading environment variables from: {env_path}")
-                load_dotenv(env_path)
-            else:
-                print(f"Warning: .env file not found at: {env_path}")
+            # 如果系统环境变量中没有，则尝试从.env文件加载
+            if not (gemini_key or chatgpt_key):
+                # 获取应用程序的基础路径
+                if getattr(sys, 'frozen', False):
+                    # 如果是打包后的可执行文件
+                    base_path = os.path.dirname(sys.executable)
+                else:
+                    # 如果是开发环境
+                    base_path = os.path.dirname(os.path.abspath(__file__))
+                
+                # 加载环境变量
+                env_path = os.path.join(base_path, '.env')
+                if os.path.exists(env_path):
+                    print(f"Loading environment variables from: {env_path}")
+                    load_dotenv(env_path)
+                else:
+                    print(f"Warning: .env file not found at: {env_path}")
+
+            # 再次检查API密钥（可能从.env文件加载）
+            if not gemini_key:
+                gemini_key = os.environ.get('GEMINI_API_KEY')
+            if not chatgpt_key:
+                chatgpt_key = os.environ.get('CHATGPT_API_KEY')
+                
         except Exception as e:
             print(f"Warning: Failed to load environment variables: {e}")
+            gemini_key = None
+            chatgpt_key = None
 
+        # 根据当前选择的AI服务检查对应的API密钥
         api_type = "gemini" if self.ai_selector.currentText() == "Gemini" else "chatgpt"
-        api_key = os.getenv('GEMINI_API_KEY' if api_type == "gemini" else 'CHATGPT_API_KEY')
+        api_key = gemini_key if api_type == "gemini" else chatgpt_key
         
         if api_key:
             self.api_key_status.setText("API Key 已配置")
@@ -215,4 +267,43 @@ class AIAssistantPanel(QWidget):
         self.output_area.append("-" * 50 + "\n")
 
     def clear_output(self):
-        self.output_area.clear() 
+        self.output_area.clear()
+
+    def generate_text(self, prompt):
+        """生成文本的同步方法，用于其他组件调用"""
+        try:
+            api_type = "gemini" if self.ai_selector.currentText() == "Gemini" else "chatgpt"
+            thread = AIResponseThread(api_type, prompt)
+            
+            # 创建一个事件循环来同步等待响应
+            from PyQt6.QtCore import QEventLoop
+            loop = QEventLoop()
+            
+            # 存储响应结果
+            response_text = [""]
+            error_text = [""]
+            
+            def handle_response(text):
+                response_text[0] = text
+                loop.quit()
+            
+            def handle_error(text):
+                error_text[0] = text
+                loop.quit()
+            
+            # 连接信号
+            thread.response_received.connect(handle_response)
+            thread.error_occurred.connect(handle_error)
+            
+            # 启动线程并等待结果
+            thread.start()
+            loop.exec()
+            
+            # 检查是否有错误
+            if error_text[0]:
+                raise Exception(error_text[0])
+                
+            return response_text[0]
+            
+        except Exception as e:
+            raise Exception(f"AI生成失败: {str(e)}") 

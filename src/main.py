@@ -5,11 +5,14 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                            QTreeWidget, QTreeWidgetItem, QTabWidget, QMenuBar, QMenu,
                            QToolBar, QStatusBar, QLabel, QTextEdit, QSplitter,
                            QPushButton, QGraphicsView, QGraphicsScene, QDockWidget,
-                           QInputDialog, QMessageBox)
+                           QInputDialog, QMessageBox, QFileDialog, QDialog,
+                           QLineEdit, QComboBox, QSpinBox, QFormLayout,
+                           QListWidget, QDialogButtonBox, QCheckBox, QGroupBox,
+                           QScrollArea, QGridLayout)
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QAction, QIcon, QPainter, QPen, QColor, QFont
 from ai_assistant import AIAssistantPanel
-from project_manager import ProjectManager, Project, ProjectStep
+from project_manager import ProjectManager, GameProject, DesignStep, DesignType
 
 class FlowChartView(QGraphicsView):
     def __init__(self):
@@ -60,6 +63,512 @@ class FormulaEditor(QWidget):
             tools_layout.addWidget(btn)
         layout.addLayout(tools_layout)
 
+class DesignStepDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("添加设计步骤")
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QFormLayout(self)
+
+        # 基本信息
+        self.name_edit = QLineEdit()
+        layout.addRow("步骤名称:", self.name_edit)
+
+        self.type_combo = QComboBox()
+        for design_type in DesignType:
+            self.type_combo.addItem(design_type.value)
+        layout.addRow("设计类型:", self.type_combo)
+
+        self.description_edit = QTextEdit()
+        layout.addRow("描述:", self.description_edit)
+
+        # 优先级和状态
+        self.priority_spin = QSpinBox()
+        self.priority_spin.setRange(0, 10)
+        layout.addRow("优先级:", self.priority_spin)
+
+        self.status_combo = QComboBox()
+        self.status_combo.addItems(["未开始", "进行中", "已完成"])
+        layout.addRow("状态:", self.status_combo)
+
+        # 时间估算
+        self.estimated_time_spin = QSpinBox()
+        self.estimated_time_spin.setRange(0, 1000)
+        layout.addRow("预计时间(小时):", self.estimated_time_spin)
+
+        # 标签
+        self.tags_edit = QLineEdit()
+        self.tags_edit.setPlaceholderText("用逗号分隔多个标签")
+        layout.addRow("标签:", self.tags_edit)
+
+        # 按钮
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addRow(buttons)
+
+    def get_step_data(self):
+        return {
+            "name": self.name_edit.text(),
+            "design_type": DesignType(self.type_combo.currentText()),
+            "description": self.description_edit.toPlainText(),
+            "priority": self.priority_spin.value(),
+            "status": self.status_combo.currentText(),
+            "estimated_time": self.estimated_time_spin.value(),
+            "tags": [tag.strip() for tag in self.tags_edit.text().split(",") if tag.strip()]
+        }
+
+class ProjectSettingsDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("项目设置")
+        self.setMinimumSize(900, 600)
+        self.setup_ui()
+        self.setup_styles()
+        self.setup_connections()
+        self.setModal(True)  # 确保对话框是模态的
+
+    def setup_ui(self):
+        # 创建主布局
+        main_layout = QHBoxLayout(self)
+        main_layout.setSpacing(8)
+        main_layout.setContentsMargins(8, 8, 8, 8)
+
+        # 左侧设置面板
+        settings_panel = QWidget()
+        settings_layout = QVBoxLayout(settings_panel)
+        settings_layout.setSpacing(8)
+        settings_layout.setContentsMargins(0, 0, 0, 0)
+
+        # 创建滚动区域
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
+        settings_layout.addWidget(scroll_area)
+
+        # 创建内容容器
+        content_widget = QWidget()
+        scroll_area.setWidget(content_widget)
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setSpacing(8)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+
+        # 基本信息部分
+        basic_info_group = QGroupBox("基本信息")
+        basic_info_layout = QFormLayout(basic_info_group)
+        basic_info_layout.setSpacing(6)
+        basic_info_layout.setContentsMargins(8, 12, 8, 8)
+        basic_info_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+
+        self.name_edit = QLineEdit()
+        self.name_edit.setPlaceholderText("输入项目名称")
+        self.name_edit.setMinimumWidth(250)
+        basic_info_layout.addRow("项目名称*:", self.name_edit)
+
+        description_layout = QHBoxLayout()
+        self.description_edit = QTextEdit()
+        self.description_edit.setPlaceholderText("输入项目描述")
+        self.description_edit.setMinimumHeight(60)
+        self.ai_description_btn = QPushButton("AI生成")
+        self.ai_description_btn.setFixedWidth(60)
+        description_layout.addWidget(self.description_edit)
+        description_layout.addWidget(self.ai_description_btn)
+        basic_info_layout.addRow("项目描述*:", description_layout)
+
+        content_layout.addWidget(basic_info_group)
+
+        # 游戏设置部分
+        game_settings_group = QGroupBox("游戏设置")
+        game_settings_layout = QFormLayout(game_settings_group)
+        game_settings_layout.setSpacing(6)
+        game_settings_layout.setContentsMargins(8, 12, 8, 8)
+        game_settings_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+
+        # 游戏类型
+        self.game_type_combo = QComboBox()
+        self.game_type_combo.addItems([
+            "经营策略", "角色扮演", "动作冒险", "模拟经营",
+            "策略战棋", "射击游戏", "体育竞技", "益智解谜"
+        ])
+        self.game_type_combo.setCurrentText("经营策略")
+        game_settings_layout.addRow("游戏类型*:", self.game_type_combo)
+
+        # 目标平台
+        self.platform_combo = QComboBox()
+        self.platform_combo.addItems(["PC", "Mobile", "Console", "Web"])
+        self.platform_combo.setCurrentText("PC")
+        game_settings_layout.addRow("目标平台*:", self.platform_combo)
+
+        # 游戏风格
+        self.style_combo = QComboBox()
+        self.style_combo.addItems([
+            "写实", "卡通", "像素", "手绘",
+            "科幻", "奇幻", "现代", "复古"
+        ])
+        game_settings_layout.addRow("游戏风格*:", self.style_combo)
+
+        content_layout.addWidget(game_settings_group)
+
+        # 目标受众 - 使用网格布局
+        audience_group = QGroupBox("目标受众*")
+        audience_layout = QGridLayout(audience_group)
+        audience_layout.setSpacing(8)
+        audience_layout.setContentsMargins(12, 12, 12, 12)
+        
+        self.audience_checkboxes = []
+        audiences = [
+            "6-12岁", "13-17岁", "18-24岁",
+            "25-29岁", "30-34岁", "35-39岁",
+            "40-44岁", "45-59岁", "60岁以上"
+        ]
+        
+        # 每行3个选项
+        for i, audience in enumerate(audiences):
+            checkbox = QCheckBox(audience)
+            checkbox.setStyleSheet("QCheckBox { padding: 2px; }")
+            self.audience_checkboxes.append(checkbox)
+            audience_layout.addWidget(checkbox, i // 3, i % 3)
+            
+        content_layout.addWidget(audience_group)
+
+        # 游戏机制部分 - 使用网格布局
+        mechanics_group = QGroupBox("游戏机制")
+        mechanics_layout = QGridLayout(mechanics_group)
+        mechanics_layout.setSpacing(8)
+        mechanics_layout.setContentsMargins(12, 12, 12, 12)
+
+        # 核心机制
+        core_mechanics_label = QLabel("核心机制*:")
+        mechanics_layout.addWidget(core_mechanics_label, 0, 0, 1, 4)
+        
+        self.mechanics_checkboxes = []
+        mechanics = [
+            "资源管理", "城市建设", "经济系统", "科技树",
+            "外交系统", "军事系统", "人口管理", "贸易系统",
+            "任务系统", "成就系统", "排行榜", "社交系统"
+        ]
+        
+        # 每行4个选项
+        for i, mechanic in enumerate(mechanics):
+            checkbox = QCheckBox(mechanic)
+            checkbox.setStyleSheet("QCheckBox { padding: 2px; }")
+            self.mechanics_checkboxes.append(checkbox)
+            mechanics_layout.addWidget(checkbox, (i // 4) + 1, i % 4)
+
+        # 游戏特色
+        features_label = QLabel("游戏特色:")
+        mechanics_layout.addWidget(features_label, 4, 0, 1, 4)
+        
+        self.features_checkboxes = []
+        features = [
+            "沙盒模式", "多人联机", "创意工坊", "成就系统",
+            "排行榜", "每日任务", "赛季系统", "交易系统",
+            "天气系统", "昼夜系统", "季节系统", "灾难系统"
+        ]
+        
+        # 每行4个选项
+        for i, feature in enumerate(features):
+            checkbox = QCheckBox(feature)
+            checkbox.setStyleSheet("QCheckBox { padding: 2px; }")
+            self.features_checkboxes.append(checkbox)
+            mechanics_layout.addWidget(checkbox, (i // 4) + 5, i % 4)
+
+        content_layout.addWidget(mechanics_group)
+
+        # 按钮
+        button_layout = QHBoxLayout()
+        button_layout.setContentsMargins(0, 8, 0, 0)
+        self.button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        self.button_box.accepted.connect(self.validate_and_accept)
+        self.button_box.rejected.connect(self.reject)
+        self.ok_button = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
+        self.ok_button.setEnabled(False)
+        button_layout.addStretch()
+        button_layout.addWidget(self.button_box)
+        content_layout.addLayout(button_layout)
+
+        # 添加设置面板到主布局
+        main_layout.addWidget(settings_panel, stretch=2)
+
+        # 右侧AI建议面板
+        ai_suggestion_group = QGroupBox("AI建议")
+        ai_suggestion_layout = QVBoxLayout(ai_suggestion_group)
+        ai_suggestion_layout.setSpacing(6)
+        ai_suggestion_layout.setContentsMargins(8, 12, 8, 8)
+
+        # AI建议文本框
+        self.ai_suggestion_text = QTextEdit()
+        self.ai_suggestion_text.setObjectName("ai_suggestion_text")
+        self.ai_suggestion_text.setReadOnly(True)
+        self.ai_suggestion_text.setMinimumHeight(400)
+        self.ai_suggestion_text.setPlaceholderText("AI分析建议将在此显示...")
+        ai_suggestion_layout.addWidget(self.ai_suggestion_text)
+
+        # 添加AI建议面板到主布局
+        main_layout.addWidget(ai_suggestion_group, stretch=1)
+
+        # 连接信号
+        self.name_edit.textChanged.connect(self.validate_form)
+        self.description_edit.textChanged.connect(self.validate_form)
+        self.game_type_combo.currentTextChanged.connect(self.validate_form)
+        self.platform_combo.currentTextChanged.connect(self.validate_form)
+        self.style_combo.currentTextChanged.connect(self.validate_form)
+        
+        # 连接所有选择变化的信号到更新AI建议
+        self.game_type_combo.currentTextChanged.connect(self.update_ai_suggestions)
+        self.platform_combo.currentTextChanged.connect(self.update_ai_suggestions)
+        self.style_combo.currentTextChanged.connect(self.update_ai_suggestions)
+        for checkbox in self.audience_checkboxes:
+            checkbox.stateChanged.connect(self.update_ai_suggestions)
+        for checkbox in self.mechanics_checkboxes:
+            checkbox.stateChanged.connect(self.update_ai_suggestions)
+        for checkbox in self.features_checkboxes:
+            checkbox.stateChanged.connect(self.update_ai_suggestions)
+
+    def validate_form(self):
+        # 检查必填项
+        name_valid = bool(self.name_edit.text().strip())
+        description_valid = bool(self.description_edit.toPlainText().strip())
+        game_type_valid = bool(self.game_type_combo.currentText())
+        platform_valid = bool(self.platform_combo.currentText())
+        style_valid = bool(self.style_combo.currentText())
+        audience_valid = any(checkbox.isChecked() for checkbox in self.audience_checkboxes)
+        mechanics_valid = any(checkbox.isChecked() for checkbox in self.mechanics_checkboxes)
+
+        # 启用/禁用确定按钮
+        self.ok_button.setEnabled(
+            name_valid and description_valid and game_type_valid and 
+            platform_valid and style_valid and audience_valid and mechanics_valid
+        )
+
+    def validate_and_accept(self):
+        if self.validate_form():
+            self.accept()
+
+    def get_project_data(self):
+        return {
+            "name": self.name_edit.text(),
+            "description": self.description_edit.toPlainText(),
+            "game_type": self.game_type_combo.currentText(),
+            "target_platform": self.platform_combo.currentText(),
+            "target_audience": [cb.text() for cb in self.audience_checkboxes if cb.isChecked()],
+            "game_style": self.style_combo.currentText(),
+            "core_mechanics": [cb.text() for cb in self.mechanics_checkboxes if cb.isChecked()],
+            "game_features": [cb.text() for cb in self.features_checkboxes if cb.isChecked()]
+        }
+
+    def setup_connections(self):
+        self.ai_description_btn.clicked.connect(self.generate_description)
+
+    def generate_description(self):
+        try:
+            # 获取当前选择的数据
+            game_type = self.game_type_combo.currentText()
+            platform = self.platform_combo.currentText()
+            style = self.style_combo.currentText()
+            selected_audience = [cb.text() for cb in self.audience_checkboxes if cb.isChecked()]
+            selected_mechanics = [cb.text() for cb in self.mechanics_checkboxes if cb.isChecked()]
+            selected_features = [cb.text() for cb in self.features_checkboxes if cb.isChecked()]
+            
+            # 构建提示词
+            prompt = f"""请根据以下信息生成一个游戏项目描述：
+游戏类型：{game_type}
+目标平台：{platform}
+游戏风格：{style}
+目标受众：{', '.join(selected_audience)}
+核心机制：{', '.join(selected_mechanics)}
+游戏特色：{', '.join(selected_features)}
+
+请生成一个详细的项目描述，包括：
+1. 游戏概述
+2. 核心玩法
+3. 特色系统
+4. 目标受众分析
+5. 市场定位
+
+要求：
+- 语言简洁明了
+- 突出游戏特色
+- 符合目标受众喜好
+- 体现游戏类型特点
+"""
+            # 使用全局的AI助手实例
+            ai_assistant = self.parent().findChild(AIAssistantPanel)
+            if ai_assistant:
+                description = ai_assistant.generate_text(prompt)
+                self.description_edit.setPlainText(description)
+                
+                # 同时更新AI建议
+                self.update_ai_suggestions()
+            else:
+                raise Exception("未找到AI助手实例")
+                
+        except Exception as e:
+            QMessageBox.warning(self, "错误", f"生成描述失败: {str(e)}\n请确保已正确配置AI接口。")
+
+    def setup_styles(self):
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #1a1a1a;
+            }
+            QGroupBox {
+                color: #ffffff;
+                font-weight: bold;
+                font-size: 14px;
+                border: 1px solid #333333;
+                border-radius: 5px;
+                margin-top: 12px;
+                background-color: #2a2a2a;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+                color: #ffffff;
+                background-color: #2a2a2a;
+            }
+            QLabel {
+                color: #ffffff;
+                font-size: 13px;
+            }
+            QLineEdit, QTextEdit, QComboBox {
+                background-color: #333333;
+                color: #ffffff;
+                border: 1px solid #444444;
+                padding: 8px;
+                border-radius: 4px;
+                font-size: 13px;
+            }
+            QLineEdit:focus, QTextEdit:focus, QComboBox:focus {
+                border: 1px solid #0d47a1;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 20px;
+            }
+            QComboBox::down-arrow {
+                image: url(resources/icons/down_arrow.png);
+                width: 12px;
+                height: 12px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #333333;
+                color: #ffffff;
+                selection-background-color: #0d47a1;
+            }
+            QCheckBox {
+                color: #ffffff;
+                spacing: 8px;
+                font-size: 13px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border: 2px solid #444444;
+                border-radius: 3px;
+                background-color: #333333;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #0d47a1;
+                border-color: #0d47a1;
+            }
+            QCheckBox::indicator:hover {
+                border-color: #0d47a1;
+            }
+            QPushButton {
+                background-color: #0d47a1;
+                color: #ffffff;
+                border: none;
+                padding: 8px 20px;
+                border-radius: 4px;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1565c0;
+            }
+            QPushButton:pressed {
+                background-color: #0a3d91;
+            }
+            QPushButton:disabled {
+                background-color: #444444;
+                color: #888888;
+            }
+            QScrollArea, QScrollBar {
+                background-color: transparent;
+                border: none;
+            }
+            QScrollBar:vertical {
+                width: 10px;
+                margin: 0px;
+            }
+            QScrollBar:horizontal {
+                height: 10px;
+                margin: 0px;
+            }
+            QScrollBar::handle {
+                background-color: #444444;
+                border-radius: 5px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:hover {
+                background-color: #555555;
+            }
+            QScrollBar::add-line, QScrollBar::sub-line {
+                height: 0px;
+                width: 0px;
+            }
+        """)
+
+    def update_ai_suggestions(self):
+        try:
+            # 获取当前选择
+            game_type = self.game_type_combo.currentText()
+            platform = self.platform_combo.currentText()
+            style = self.style_combo.currentText()
+            selected_audience = [cb.text() for cb in self.audience_checkboxes if cb.isChecked()]
+            selected_mechanics = [cb.text() for cb in self.mechanics_checkboxes if cb.isChecked()]
+            selected_features = [cb.text() for cb in self.features_checkboxes if cb.isChecked()]
+
+            # 构建提示词
+            prompt = f"""作为一个专业的游戏设计师，请分析以下游戏设计选择并提供建议：
+
+游戏类型：{game_type}
+目标平台：{platform}
+游戏风格：{style}
+目标受众：{', '.join(selected_audience) if selected_audience else '未选择'}
+核心机制：{', '.join(selected_mechanics) if selected_mechanics else '未选择'}
+游戏特色：{', '.join(selected_features) if selected_features else '未选择'}
+
+请提供以下方面的建议：
+1. 游戏类型与平台的匹配度分析
+2. 目标受众的定位是否合理
+3. 核心机制的组合是否协调
+4. 游戏特色的选择是否合适
+5. 整体设计方案的优缺点
+6. 可能的改进建议
+
+请用简洁明了的语言，突出重点，并给出具体的建议。"""
+
+            # 使用全局的AI助手实例
+            ai_assistant = self.parent().findChild(AIAssistantPanel)
+            if ai_assistant:
+                suggestions = ai_assistant.generate_text(prompt)
+                self.ai_suggestion_text.setPlainText(suggestions)
+            else:
+                raise Exception("未找到AI助手实例")
+                
+        except Exception as e:
+            self.ai_suggestion_text.setPlainText(f"生成AI建议时出错：{str(e)}\n请确保已正确配置AI接口。")
+
 class DesignerEditor(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -107,23 +616,24 @@ class DesignerEditor(QMainWindow):
         
         print("Setting up planning tree...")
         self.planning_tree = QTreeWidget()
-        self.planning_tree.setHeaderLabel("策划案结构")
+        self.planning_tree.setHeaderLabel("项目结构")
         self.setup_planning_tree()
         left_layout.addWidget(self.planning_tree)
         
         print("Creating framework tabs...")
-        framework_tabs = QTabWidget()
-        framework_tabs.addTab(QWidget(), "系统架构")
-        framework_tabs.addTab(QWidget(), "数据结构")
-        framework_tabs.addTab(QWidget(), "接口定义")
-        left_layout.addWidget(framework_tabs)
+        self.framework_tabs = QTabWidget()
+        self.framework_tabs.addTab(QWidget(), "系统架构")
+        self.framework_tabs.addTab(QWidget(), "数据结构")
+        self.framework_tabs.addTab(QWidget(), "接口定义")
+        left_layout.addWidget(self.framework_tabs)
         
         print("Creating right panel...")
         right_panel = QTabWidget()
         
         print("Creating flow chart view...")
-        self.flow_chart = FlowChartView()
-        right_panel.addTab(self.flow_chart, "游戏流程")
+        self.flow_chart_view = QTextEdit()
+        self.flow_chart_view.setPlaceholderText("流程图视图")
+        right_panel.addTab(self.flow_chart_view, "游戏流程")
         
         print("Creating formula editor...")
         self.formula_editor = FormulaEditor()
@@ -350,71 +860,135 @@ class DesignerEditor(QMainWindow):
         """)
 
     def new_project(self):
-        name, ok = QInputDialog.getText(self, "新建项目", "请输入项目名称:")
-        if ok and name:
-            description, ok = QInputDialog.getText(self, "新建项目", "请输入项目描述:")
-            if ok:
-                self.project_manager.create_project(name, description)
-                self.statusBar().showMessage(f"已创建新项目: {name}")
+        print("Creating new project...")
+        dialog = ProjectSettingsDialog(self)
+        dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+        result = dialog.exec()
+        
+        if result == QDialog.DialogCode.Accepted:
+            try:
+                data = dialog.get_project_data()
+                project = self.project_manager.create_project(
+                    data["name"],
+                    data["description"],
+                    data["game_type"]
+                )
+                project.target_platforms = [data["target_platform"]]
+                project.target_audience = data["target_audience"]
+                project.game_style = data["game_style"]
+                project.core_mechanics = data["core_mechanics"]
+                project.game_features = data["game_features"]
+                
                 self.update_project_tree()
+                self.statusBar().showMessage(f'已创建新项目: {data["name"]}')
+            except Exception as e:
+                print(f"Error creating project: {str(e)}")
+                QMessageBox.critical(self, '错误', f'创建项目失败: {str(e)}')
+        else:
+            print("Project creation cancelled by user")
 
     def open_project(self):
-        projects = self.project_manager.list_projects()
-        if not projects:
-            QMessageBox.information(self, "打开项目", "没有找到任何项目")
-            return
+        if self.project_manager.is_project_modified():
+            reply = QMessageBox.question(self, '保存更改',
+                                       '当前项目已修改，是否保存更改？',
+                                       QMessageBox.StandardButton.Yes |
+                                       QMessageBox.StandardButton.No |
+                                       QMessageBox.StandardButton.Cancel)
             
-        name, ok = QInputDialog.getItem(self, "打开项目", "选择项目:", projects, 0, False)
-        if ok and name:
+            if reply == QMessageBox.StandardButton.Cancel:
+                return
+            elif reply == QMessageBox.StandardButton.Yes:
+                self.save_project()
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, '打开项目', '', 'DesignerEditor Project (*.dep)')
+        
+        if file_path:
             try:
-                self.project_manager.load_project(name)
-                self.statusBar().showMessage(f"已打开项目: {name}")
+                project = self.project_manager.load_project(file_path)
                 self.update_project_tree()
+                self.statusBar().showMessage(f'已打开项目: {project.name}')
             except Exception as e:
-                QMessageBox.critical(self, "错误", f"打开项目失败: {str(e)}")
+                QMessageBox.critical(self, '错误', f'打开项目失败: {str(e)}')
 
     def save_project(self):
         if not self.project_manager.current_project:
-            QMessageBox.warning(self, "保存项目", "没有当前项目")
+            QMessageBox.warning(self, '警告', '没有打开的项目')
             return
-            
+
         try:
-            self.project_manager.save_project(self.project_manager.current_project)
-            self.statusBar().showMessage(f"项目已保存: {self.project_manager.current_project.name}")
+            file_path = self.project_manager.get_project_file_path()
+            if not file_path:
+                file_path, _ = QFileDialog.getSaveFileName(
+                    self, '保存项目', '', 'DesignerEditor Project (*.dep)')
+            
+            if file_path:
+                self.project_manager.save_project(self.project_manager.current_project, file_path)
+                self.statusBar().showMessage(f'项目已保存: {file_path}')
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"保存项目失败: {str(e)}")
+            QMessageBox.critical(self, '错误', f'保存项目失败: {str(e)}')
 
     def add_step(self):
         if not self.project_manager.current_project:
-            QMessageBox.warning(self, "添加步骤", "请先创建或打开一个项目")
+            QMessageBox.warning(self, '警告', '请先创建或打开一个项目')
             return
-            
-        name, ok = QInputDialog.getText(self, "添加步骤", "请输入步骤名称:")
-        if ok and name:
-            description, ok = QInputDialog.getText(self, "添加步骤", "请输入步骤描述:")
-            if ok:
-                step = ProjectStep(name, description)
+
+        dialog = DesignStepDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            try:
+                data = dialog.get_step_data()
+                step = DesignStep(
+                    name=data["name"],
+                    design_type=data["design_type"],
+                    description=data["description"]
+                )
+                step.priority = data["priority"]
+                step.status = data["status"]
+                step.estimated_time = data["estimated_time"]
+                step.tags = data["tags"]
+                
                 self.project_manager.current_project.add_step(step)
                 self.update_project_tree()
-                self.statusBar().showMessage(f"已添加步骤: {name}")
+                self.statusBar().showMessage(f'已添加步骤: {data["name"]}')
+            except Exception as e:
+                QMessageBox.critical(self, '错误', f'添加步骤失败: {str(e)}')
 
     def update_project_tree(self):
         self.planning_tree.clear()
-        if not self.project_manager.current_project:
-            return
+        if self.project_manager.current_project:
+            project = self.project_manager.current_project
+            project_item = QTreeWidgetItem([project.name])
+            self.planning_tree.addTopLevelItem(project_item)
             
-        root = QTreeWidgetItem(self.planning_tree, [self.project_manager.current_project.name])
-        root.setToolTip(0, self.project_manager.current_project.description)
+            # 按设计类型分组
+            type_groups = {}
+            for step in project.steps:
+                if step.design_type.value not in type_groups:
+                    type_groups[step.design_type.value] = QTreeWidgetItem([step.design_type.value])
+                    project_item.addChild(type_groups[step.design_type.value])
+                
+                step_item = QTreeWidgetItem([step.name])
+                if step.is_generated:
+                    step_item.setIcon(0, QIcon('resources/icons/check.png'))
+                type_groups[step.design_type.value].addChild(step_item)
+            
+            self.planning_tree.expandAll()
+
+    def closeEvent(self, event):
+        if self.project_manager.is_project_modified():
+            reply = QMessageBox.question(self, '保存更改',
+                                       '当前项目已修改，是否保存更改？',
+                                       QMessageBox.StandardButton.Yes |
+                                       QMessageBox.StandardButton.No |
+                                       QMessageBox.StandardButton.Cancel)
+            
+            if reply == QMessageBox.StandardButton.Cancel:
+                event.ignore()
+                return
+            elif reply == QMessageBox.StandardButton.Yes:
+                self.save_project()
         
-        for step in self.project_manager.current_project.steps:
-            step_item = QTreeWidgetItem(root, [step.name])
-            step_item.setToolTip(0, step.description)
-            if step.is_generated:
-                step_item.setIcon(0, QIcon("resources/icons/check.png"))
-            else:
-                step_item.setIcon(0, QIcon("resources/icons/cross.png"))
-        
-        self.planning_tree.expandAll()
+        event.accept()
 
 def main():
     try:
