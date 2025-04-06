@@ -127,6 +127,14 @@ class ProjectSettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("项目设置")
         self.setMinimumSize(900, 600)
+        
+        # 获取资源路径
+        if getattr(sys, 'frozen', False):
+            base_path = os.path.dirname(sys.executable)
+        else:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+        self.resource_path = os.path.join(base_path, 'resources')
+        
         self.setup_ui()
         self.setup_styles()
         self.setup_connections()
@@ -174,7 +182,8 @@ class ProjectSettingsDialog(QDialog):
         description_layout = QHBoxLayout()
         self.description_edit = QTextEdit()
         self.description_edit.setPlaceholderText("输入项目描述")
-        self.description_edit.setMinimumHeight(60)
+        self.description_edit.setMinimumHeight(120)  # 增加高度
+        self.description_edit.setMinimumWidth(300)   # 增加宽度
         self.ai_description_btn = QPushButton("AI生成")
         self.ai_description_btn.setFixedWidth(60)
         description_layout.addWidget(self.description_edit)
@@ -349,9 +358,53 @@ class ProjectSettingsDialog(QDialog):
             platform_valid and style_valid and audience_valid and mechanics_valid
         )
 
+        # 显示验证状态
+        if not name_valid:
+            self.name_edit.setStyleSheet("border: 1px solid #ff0000;")
+        else:
+            self.name_edit.setStyleSheet("border: 1px solid #444444;")
+
+        if not description_valid:
+            self.description_edit.setStyleSheet("border: 1px solid #ff0000;")
+        else:
+            self.description_edit.setStyleSheet("border: 1px solid #444444;")
+
+        if not audience_valid:
+            for checkbox in self.audience_checkboxes:
+                checkbox.setStyleSheet("color: #ff0000;")
+        else:
+            for checkbox in self.audience_checkboxes:
+                checkbox.setStyleSheet("color: #ffffff;")
+
+        if not mechanics_valid:
+            for checkbox in self.mechanics_checkboxes:
+                checkbox.setStyleSheet("color: #ff0000;")
+        else:
+            for checkbox in self.mechanics_checkboxes:
+                checkbox.setStyleSheet("color: #ffffff;")
+
     def validate_and_accept(self):
-        if self.validate_form():
-            self.accept()
+        # 检查是否有未填写的必填项
+        missing_fields = []
+        if not self.name_edit.text().strip():
+            missing_fields.append("项目名称")
+        if not self.description_edit.toPlainText().strip():
+            missing_fields.append("项目描述")
+        if not any(checkbox.isChecked() for checkbox in self.audience_checkboxes):
+            missing_fields.append("目标受众")
+        if not any(checkbox.isChecked() for checkbox in self.mechanics_checkboxes):
+            missing_fields.append("核心机制")
+
+        if missing_fields:
+            QMessageBox.warning(
+                self,
+                "缺少必填项",
+                f"请填写以下必填项：\n{', '.join(missing_fields)}"
+            )
+            return
+
+        # 如果所有必填项都已填写，接受对话框
+        self.accept()
 
     def get_project_data(self):
         return {
@@ -415,11 +468,44 @@ class ProjectSettingsDialog(QDialog):
             QMessageBox.warning(self, "错误", f"生成描述失败: {str(e)}\n请确保已正确配置AI接口。")
 
     def setup_styles(self):
-        self.setStyleSheet("""
-            QDialog {
+        # 获取图标路径
+        down_arrow_path = os.path.join(self.resource_path, 'icons', 'down_arrow.svg')
+        check_path = os.path.join(self.resource_path, 'icons', 'check.svg')
+        down_arrow_path = down_arrow_path.replace('\\', '/')  # 修复路径分隔符
+        check_path = check_path.replace('\\', '/')  # 修复路径分隔符
+        
+        # 设置复选框样式
+        checkbox_style = f"""
+            QCheckBox {{
+                color: #ffffff;
+                spacing: 8px;
+                font-size: 13px;
+            }}
+            QCheckBox::indicator {{
+                width: 18px;
+                height: 18px;
+                border: 2px solid #444444;
+                border-radius: 3px;
+                background-color: #333333;
+            }}
+            QCheckBox::indicator:checked {{
+                background-color: #0d47a1;
+                border-color: #0d47a1;
+                image: url("{check_path}");
+            }}
+            QCheckBox::indicator:hover {{
+                border-color: #0d47a1;
+            }}
+        """
+        
+        for checkbox in self.audience_checkboxes + self.mechanics_checkboxes + self.features_checkboxes:
+            checkbox.setStyleSheet(checkbox_style)
+        
+        self.setStyleSheet(f"""
+            QDialog {{
                 background-color: #1a1a1a;
-            }
-            QGroupBox {
+            }}
+            QGroupBox {{
                 color: #ffffff;
                 font-weight: bold;
                 font-size: 14px;
@@ -427,63 +513,44 @@ class ProjectSettingsDialog(QDialog):
                 border-radius: 5px;
                 margin-top: 12px;
                 background-color: #2a2a2a;
-            }
-            QGroupBox::title {
+            }}
+            QGroupBox::title {{
                 subcontrol-origin: margin;
                 left: 10px;
                 padding: 0 5px;
                 color: #ffffff;
                 background-color: #2a2a2a;
-            }
-            QLabel {
+            }}
+            QLabel {{
                 color: #ffffff;
                 font-size: 13px;
-            }
-            QLineEdit, QTextEdit, QComboBox {
+            }}
+            QLineEdit, QTextEdit, QComboBox {{
                 background-color: #333333;
                 color: #ffffff;
                 border: 1px solid #444444;
                 padding: 8px;
                 border-radius: 4px;
                 font-size: 13px;
-            }
-            QLineEdit:focus, QTextEdit:focus, QComboBox:focus {
+            }}
+            QLineEdit:focus, QTextEdit:focus, QComboBox:focus {{
                 border: 1px solid #0d47a1;
-            }
-            QComboBox::drop-down {
+            }}
+            QComboBox::drop-down {{
                 border: none;
                 width: 20px;
-            }
-            QComboBox::down-arrow {
-                image: url(resources/icons/down_arrow.png);
+            }}
+            QComboBox::down-arrow {{
+                image: url("{down_arrow_path}");
                 width: 12px;
                 height: 12px;
-            }
-            QComboBox QAbstractItemView {
+            }}
+            QComboBox QAbstractItemView {{
                 background-color: #333333;
                 color: #ffffff;
                 selection-background-color: #0d47a1;
-            }
-            QCheckBox {
-                color: #ffffff;
-                spacing: 8px;
-                font-size: 13px;
-            }
-            QCheckBox::indicator {
-                width: 18px;
-                height: 18px;
-                border: 2px solid #444444;
-                border-radius: 3px;
-                background-color: #333333;
-            }
-            QCheckBox::indicator:checked {
-                background-color: #0d47a1;
-                border-color: #0d47a1;
-            }
-            QCheckBox::indicator:hover {
-                border-color: #0d47a1;
-            }
-            QPushButton {
+            }}
+            QPushButton {{
                 background-color: #0d47a1;
                 color: #ffffff;
                 border: none;
@@ -491,41 +558,62 @@ class ProjectSettingsDialog(QDialog):
                 border-radius: 4px;
                 font-size: 13px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
+                min-width: 80px;
+            }}
+            QPushButton:hover {{
                 background-color: #1565c0;
-            }
-            QPushButton:pressed {
+            }}
+            QPushButton:pressed {{
                 background-color: #0a3d91;
-            }
-            QPushButton:disabled {
+            }}
+            QPushButton:disabled {{
                 background-color: #444444;
                 color: #888888;
-            }
-            QScrollArea, QScrollBar {
+            }}
+            QDialogButtonBox QPushButton {{
+                background-color: #0d47a1;
+                color: #ffffff;
+                border: none;
+                padding: 8px 20px;
+                border-radius: 4px;
+                font-size: 13px;
+                font-weight: bold;
+                min-width: 80px;
+            }}
+            QDialogButtonBox QPushButton:hover {{
+                background-color: #1565c0;
+            }}
+            QDialogButtonBox QPushButton:pressed {{
+                background-color: #0a3d91;
+            }}
+            QDialogButtonBox QPushButton:disabled {{
+                background-color: #444444;
+                color: #888888;
+            }}
+            QScrollArea, QScrollBar {{
                 background-color: transparent;
                 border: none;
-            }
-            QScrollBar:vertical {
+            }}
+            QScrollBar:vertical {{
                 width: 10px;
                 margin: 0px;
-            }
-            QScrollBar:horizontal {
+            }}
+            QScrollBar:horizontal {{
                 height: 10px;
                 margin: 0px;
-            }
-            QScrollBar::handle {
+            }}
+            QScrollBar::handle {{
                 background-color: #444444;
                 border-radius: 5px;
                 min-height: 20px;
-            }
-            QScrollBar::handle:hover {
+            }}
+            QScrollBar::handle:hover {{
                 background-color: #555555;
-            }
-            QScrollBar::add-line, QScrollBar::sub-line {
+            }}
+            QScrollBar::add-line, QScrollBar::sub-line {{
                 height: 0px;
                 width: 0px;
-            }
+            }}
         """)
 
     def update_ai_suggestions(self):
@@ -539,7 +627,7 @@ class ProjectSettingsDialog(QDialog):
             selected_features = [cb.text() for cb in self.features_checkboxes if cb.isChecked()]
 
             # 构建提示词
-            prompt = f"""作为一个专业的游戏设计师，请分析以下游戏设计选择并提供建议：
+            prompt = f"""请根据以下游戏设计选择提供简洁的建议：
 
 游戏类型：{game_type}
 目标平台：{platform}
@@ -549,14 +637,16 @@ class ProjectSettingsDialog(QDialog):
 游戏特色：{', '.join(selected_features) if selected_features else '未选择'}
 
 请提供以下方面的建议：
-1. 游戏类型与平台的匹配度分析
-2. 目标受众的定位是否合理
-3. 核心机制的组合是否协调
-4. 游戏特色的选择是否合适
-5. 整体设计方案的优缺点
-6. 可能的改进建议
+1. 目标受众与游戏类型的匹配度
+2. 核心机制是否适合目标平台
+3. 游戏特色是否与游戏风格协调
+4. 需要补充的关键设计点
 
-请用简洁明了的语言，突出重点，并给出具体的建议。"""
+要求：
+- 每个建议不超过50字
+- 直接指出问题或建议
+- 避免重复说明
+- 重点突出需要改进的地方"""
 
             # 使用全局的AI助手实例
             ai_assistant = self.parent().findChild(AIAssistantPanel)
@@ -879,8 +969,38 @@ class DesignerEditor(QMainWindow):
                 project.core_mechanics = data["core_mechanics"]
                 project.game_features = data["game_features"]
                 
+                # 更新项目树显示
                 self.update_project_tree()
-                self.statusBar().showMessage(f'已创建新项目: {data["name"]}')
+                self.statusBar.showMessage(f'已创建新项目: {data["name"]}')
+                
+                # 在项目树中显示详细信息
+                root = QTreeWidgetItem(self.planning_tree, ["项目信息"])
+                QTreeWidgetItem(root, [f"项目名称: {data['name']}"])
+                QTreeWidgetItem(root, [f"游戏类型: {data['game_type']}"])
+                QTreeWidgetItem(root, [f"目标平台: {data['target_platform']}"])
+                QTreeWidgetItem(root, [f"游戏风格: {data['game_style']}"])
+                
+                # 添加目标受众
+                audience_item = QTreeWidgetItem(root, ["目标受众"])
+                for audience in data["target_audience"]:
+                    QTreeWidgetItem(audience_item, [audience])
+                
+                # 添加核心机制
+                mechanics_item = QTreeWidgetItem(root, ["核心机制"])
+                for mechanic in data["core_mechanics"]:
+                    QTreeWidgetItem(mechanics_item, [mechanic])
+                
+                # 添加游戏特色
+                features_item = QTreeWidgetItem(root, ["游戏特色"])
+                for feature in data["game_features"]:
+                    QTreeWidgetItem(features_item, [feature])
+                
+                # 添加项目描述
+                desc_item = QTreeWidgetItem(root, ["项目描述"])
+                QTreeWidgetItem(desc_item, [data["description"]])
+                
+                self.planning_tree.expandAll()
+                
             except Exception as e:
                 print(f"Error creating project: {str(e)}")
                 QMessageBox.critical(self, '错误', f'创建项目失败: {str(e)}')
@@ -888,28 +1008,77 @@ class DesignerEditor(QMainWindow):
             print("Project creation cancelled by user")
 
     def open_project(self):
-        if self.project_manager.is_project_modified():
-            reply = QMessageBox.question(self, '保存更改',
-                                       '当前项目已修改，是否保存更改？',
-                                       QMessageBox.StandardButton.Yes |
-                                       QMessageBox.StandardButton.No |
-                                       QMessageBox.StandardButton.Cancel)
+        try:
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, '打开项目', '', 'DesignerEditor Project (*.dep)')
             
-            if reply == QMessageBox.StandardButton.Cancel:
-                return
-            elif reply == QMessageBox.StandardButton.Yes:
-                self.save_project()
-
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, '打开项目', '', 'DesignerEditor Project (*.dep)')
-        
-        if file_path:
-            try:
+            if file_path:
                 project = self.project_manager.load_project(file_path)
-                self.update_project_tree()
-                self.statusBar().showMessage(f'已打开项目: {project.name}')
-            except Exception as e:
-                QMessageBox.critical(self, '错误', f'打开项目失败: {str(e)}')
+                if project:
+                    self.project_manager.current_project = project
+                    self.update_project_tree()
+                    
+                    # 在项目树中显示详细信息
+                    self.planning_tree.clear()  # 清空现有内容
+                    root = QTreeWidgetItem(self.planning_tree, ["项目信息"])
+                    QTreeWidgetItem(root, [f"项目名称: {project.name}"])
+                    QTreeWidgetItem(root, [f"游戏类型: {project.game_type}"])
+                    QTreeWidgetItem(root, [f"目标平台: {', '.join(project.target_platforms)}"])
+                    QTreeWidgetItem(root, [f"游戏风格: {project.game_style}"])
+                    
+                    # 添加目标受众
+                    audience_item = QTreeWidgetItem(root, ["目标受众"])
+                    for audience in project.target_audience:
+                        QTreeWidgetItem(audience_item, [audience])
+                    
+                    # 添加核心机制
+                    mechanics_item = QTreeWidgetItem(root, ["核心机制"])
+                    for mechanic in project.core_mechanics:
+                        QTreeWidgetItem(mechanics_item, [mechanic])
+                    
+                    # 添加游戏特色
+                    features_item = QTreeWidgetItem(root, ["游戏特色"])
+                    for feature in project.game_features:
+                        QTreeWidgetItem(features_item, [feature])
+                    
+                    # 添加项目描述
+                    desc_item = QTreeWidgetItem(root, ["项目描述"])
+                    QTreeWidgetItem(desc_item, [project.description])
+                    
+                    self.planning_tree.expandAll()
+                    self.statusBar.showMessage(f'已加载项目: {project.name}')
+                    
+                    # 显示加载成功信息
+                    msg_box = QMessageBox(self)
+                    msg_box.setWindowTitle('加载成功')
+                    msg_box.setText(f'项目已成功加载:\n{project.name}')
+                    msg_box.setStyleSheet("""
+                        QMessageBox {
+                            background-color: #2b2b2b;
+                            color: #ffffff;
+                        }
+                        QMessageBox QLabel {
+                            color: #ffffff;
+                        }
+                        QMessageBox QPushButton {
+                            background-color: #3c3c3c;
+                            color: #ffffff;
+                            border: 1px solid #4a4a4a;
+                            padding: 5px 15px;
+                            border-radius: 3px;
+                        }
+                        QMessageBox QPushButton:hover {
+                            background-color: #4a4a4a;
+                        }
+                        QMessageBox QPushButton:pressed {
+                            background-color: #5a5a5a;
+                        }
+                    """)
+                    msg_box.exec()
+                else:
+                    QMessageBox.critical(self, '错误', '加载项目失败')
+        except Exception as e:
+            QMessageBox.critical(self, '错误', f'打开项目失败: {str(e)}')
 
     def save_project(self):
         if not self.project_manager.current_project:
@@ -924,7 +1093,34 @@ class DesignerEditor(QMainWindow):
             
             if file_path:
                 self.project_manager.save_project(self.project_manager.current_project, file_path)
-                self.statusBar().showMessage(f'项目已保存: {file_path}')
+                # 显示保存成功信息
+                msg_box = QMessageBox(self)
+                msg_box.setWindowTitle('保存成功')
+                msg_box.setText(f'项目已成功保存到:\n{file_path}')
+                msg_box.setStyleSheet("""
+                    QMessageBox {
+                        background-color: #2b2b2b;
+                        color: #ffffff;
+                    }
+                    QMessageBox QLabel {
+                        color: #ffffff;
+                    }
+                    QMessageBox QPushButton {
+                        background-color: #3c3c3c;
+                        color: #ffffff;
+                        border: 1px solid #4a4a4a;
+                        padding: 5px 15px;
+                        border-radius: 3px;
+                    }
+                    QMessageBox QPushButton:hover {
+                        background-color: #4a4a4a;
+                    }
+                    QMessageBox QPushButton:pressed {
+                        background-color: #5a5a5a;
+                    }
+                """)
+                msg_box.exec()
+                self.statusBar.showMessage(f'项目已保存: {file_path}')
         except Exception as e:
             QMessageBox.critical(self, '错误', f'保存项目失败: {str(e)}')
 
@@ -992,57 +1188,91 @@ class DesignerEditor(QMainWindow):
 
 def main():
     try:
-        print("Starting application...")
+        # 创建应用实例
+        app = QApplication(sys.argv)
         
-        # 设置 DPI 感知
-        if hasattr(Qt.ApplicationAttribute, 'AA_EnableHighDpiScaling'):
-            QApplication.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
-        if hasattr(Qt.ApplicationAttribute, 'AA_UseHighDpiPixmaps'):
-            QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
+        # 设置应用信息
+        app.setApplicationName("UnityMindFlowPro Designer")
+        app.setApplicationVersion("1.0.0")
+        app.setOrganizationName("UnityMindFlowPro")
         
-        # 获取应用程序的基础路径
+        # 设置资源路径
         if getattr(sys, 'frozen', False):
+            # 打包后的路径
             base_path = os.path.dirname(sys.executable)
-            print(f"Running in frozen mode from: {base_path}")
         else:
+            # 开发环境路径
             base_path = os.path.dirname(os.path.abspath(__file__))
-            print(f"Running in development mode from: {base_path}")
-        
+            
+        resource_path = os.path.join(base_path, 'resources')
+        if not os.path.exists(resource_path):
+            os.makedirs(resource_path)
+            
+        icons_path = os.path.join(resource_path, 'icons')
+        if not os.path.exists(icons_path):
+            os.makedirs(icons_path)
+            
         # 加载环境变量
         env_path = os.path.join(base_path, '.env')
         if os.path.exists(env_path):
-            print(f"Loading environment variables from: {env_path}")
             load_dotenv(env_path)
         else:
-            print(f"Warning: .env file not found at: {env_path}")
+            print("警告: 未找到 .env 文件")
             
-        # 确保 QApplication 在主线程中创建
-        app = QApplication.instance()
-        if app is None:
-            print("Creating new QApplication instance...")
-            app = QApplication(sys.argv)
-        
-        # 设置应用程序样式
-        print("Setting application style...")
-        app.setStyle("Fusion")
-        
         # 创建主窗口
-        print("Creating main window...")
         window = DesignerEditor()
-        
-        # 显示窗口
-        print("Showing main window...")
         window.show()
-        window.raise_()  # 将窗口提升到最前
-        window.activateWindow()  # 激活窗口
         
-        print("Entering event loop...")
-        return app.exec()
+        # 运行应用
+        sys.exit(app.exec())
+        
     except Exception as e:
-        print(f"Error starting application: {e}")
-        import traceback
-        traceback.print_exc()
-        return 1
+        # 创建错误窗口
+        error_dialog = QDialog()
+        error_dialog.setWindowTitle("错误")
+        error_dialog.setMinimumSize(600, 400)
+        error_dialog.setWindowFlags(error_dialog.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        
+        # 创建布局
+        layout = QVBoxLayout(error_dialog)
+        
+        # 错误信息显示
+        error_text = QTextEdit()
+        error_text.setReadOnly(True)
+        error_text.setPlainText(f"发生错误:\n{str(e)}\n\n详细错误信息:\n{traceback.format_exc()}")
+        error_text.setStyleSheet("""
+            QTextEdit {
+                background-color: #2a2a2a;
+                color: #ffffff;
+                border: 1px solid #444444;
+                border-radius: 4px;
+                padding: 8px;
+                font-family: Consolas, monospace;
+            }
+        """)
+        layout.addWidget(error_text)
+        
+        # 按钮布局
+        button_layout = QHBoxLayout()
+        
+        # 复制按钮
+        copy_button = QPushButton("复制错误信息")
+        copy_button.clicked.connect(lambda: QApplication.clipboard().setText(error_text.toPlainText()))
+        button_layout.addWidget(copy_button)
+        
+        # 关闭按钮
+        close_button = QPushButton("关闭")
+        close_button.clicked.connect(error_dialog.close)
+        button_layout.addWidget(close_button)
+        
+        layout.addLayout(button_layout)
+        
+        # 显示错误窗口
+        error_dialog.exec()
+        
+        # 保持应用实例运行
+        if 'app' in locals():
+            sys.exit(app.exec())
 
 if __name__ == '__main__':
     sys.exit(main()) 
