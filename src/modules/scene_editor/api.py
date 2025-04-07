@@ -1,83 +1,45 @@
-"""场景编辑器模块API"""
+"""
+Scene Editor API
+场景编辑器API接口
+
+This module provides the API interface for scene editing functionality.
+此模块提供场景编辑功能的API接口。
+"""
+
 from typing import Dict, List, Tuple, Optional, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 import json
 import os
 
 class NodeType(Enum):
-    """节点类型枚举"""
-    SCENE = "场景"
-    CHARACTER = "角色"
-    PROP = "道具"
-    EVENT = "事件"
-    CONDITION = "条件"
+    """Scene node type enumeration."""
+    CONTAINER = "容器"
+    SPRITE = "精灵"
+    TEXT = "文本"
+    BUTTON = "按钮"
+    INPUT = "输入框"
+    CUSTOM = "自定义"
 
 @dataclass
 class SceneNode:
-    """场景节点"""
+    """Scene node data class."""
+    id: str
     name: str
-    type: NodeType
-    description: str = ""
-    properties: Dict[str, str] = None
-    children: List['SceneNode'] = None
-    
-    def __post_init__(self):
-        if self.properties is None:
-            self.properties = {}
-        if self.children is None:
-            self.children = []
-            
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        return {
-            "name": self.name,
-            "type": self.type.value,
-            "description": self.description,
-            "properties": self.properties,
-            "children": [child.to_dict() for child in self.children]
-        }
-        
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'SceneNode':
-        """从字典创建"""
-        node = cls(
-            name=data["name"],
-            type=NodeType(data["type"]),
-            description=data.get("description", ""),
-            properties=data.get("properties", {})
-        )
-        node.children = [cls.from_dict(child) for child in data.get("children", [])]
-        return node
+    node_type: NodeType
+    position: tuple[float, float] = (0.0, 0.0)
+    size: tuple[float, float] = (100.0, 100.0)
+    properties: Dict[str, Any] = field(default_factory=dict)
+    children: List['SceneNode'] = field(default_factory=list)
 
 @dataclass
 class Scene:
-    """场景"""
+    """Scene data class."""
     name: str
-    description: str = ""
-    nodes: List[SceneNode] = None
-    
-    def __post_init__(self):
-        if self.nodes is None:
-            self.nodes = []
-            
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        return {
-            "name": self.name,
-            "description": self.description,
-            "nodes": [node.to_dict() for node in self.nodes]
-        }
-        
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'Scene':
-        """从字典创建"""
-        scene = cls(
-            name=data["name"],
-            description=data.get("description", "")
-        )
-        scene.nodes = [SceneNode.from_dict(node) for node in data.get("nodes", [])]
-        return scene
+    root_node: SceneNode
+    background_color: str = "#1e1e1e"
+    grid_size: int = 20
+    snap_to_grid: bool = True
 
 @dataclass
 class NodeData:
@@ -96,17 +58,91 @@ class ConnectionData:
     properties: Dict[str, str]
 
 class SceneEditorAPI:
-    """场景编辑器模块API接口"""
+    """Scene editor API interface class."""
     
-    @staticmethod
-    def create_scene(name: str) -> Optional[Scene]:
-        """创建新场景"""
-        try:
-            return Scene(name)
-        except Exception as e:
-            print(f"创建场景失败: {str(e)}")
-            return None
+    def __init__(self):
+        self.current_scene: Optional[Scene] = None
+        self.scene_changed_callbacks = []
+    
+    def create_scene(self, name: str) -> Scene:
+        """Create a new scene."""
+        root_node = SceneNode(
+            id="root",
+            name="Root",
+            node_type=NodeType.CONTAINER
+        )
+        scene = Scene(name=name, root_node=root_node)
+        self.current_scene = scene
+        self._notify_scene_changed()
+        return scene
+    
+    def add_node(self, parent_id: str, node_data: dict) -> SceneNode:
+        """Add a new node to the scene."""
+        if not self.current_scene:
+            raise RuntimeError("No scene is currently open")
             
+        node = SceneNode(**node_data)
+        parent = self._find_node(self.current_scene.root_node, parent_id)
+        if parent:
+            parent.children.append(node)
+            self._notify_scene_changed()
+        return node
+    
+    def update_node(self, node_id: str, properties: dict) -> bool:
+        """Update node properties."""
+        if not self.current_scene:
+            return False
+            
+        node = self._find_node(self.current_scene.root_node, node_id)
+        if node:
+            for key, value in properties.items():
+                setattr(node, key, value)
+            self._notify_scene_changed()
+            return True
+        return False
+    
+    def delete_node(self, node_id: str) -> bool:
+        """Delete a node from the scene."""
+        if not self.current_scene:
+            return False
+            
+        result = self._delete_node_recursive(
+            self.current_scene.root_node,
+            node_id
+        )
+        if result:
+            self._notify_scene_changed()
+        return result
+    
+    def register_scene_changed_callback(self, callback):
+        """Register a callback for scene changes."""
+        self.scene_changed_callbacks.append(callback)
+    
+    def _notify_scene_changed(self):
+        """Notify all registered callbacks about scene changes."""
+        for callback in self.scene_changed_callbacks:
+            callback()
+    
+    def _find_node(self, root: SceneNode, node_id: str) -> Optional[SceneNode]:
+        """Find a node by its ID."""
+        if root.id == node_id:
+            return root
+        for child in root.children:
+            result = self._find_node(child, node_id)
+            if result:
+                return result
+        return None
+    
+    def _delete_node_recursive(self, root: SceneNode, node_id: str) -> bool:
+        """Delete a node recursively."""
+        for i, child in enumerate(root.children):
+            if child.id == node_id:
+                root.children.pop(i)
+                return True
+            if self._delete_node_recursive(child, node_id):
+                return True
+        return False
+    
     @staticmethod
     def save_scene(scene: Scene) -> bool:
         """保存场景"""
@@ -175,18 +211,6 @@ class SceneEditorAPI:
             
     def get_nodes(self) -> List[NodeData]:
         """获取所有节点"""
-        raise NotImplementedError
-        
-    def add_node(self, node_type: NodeType, position: Tuple[float, float]) -> Optional[NodeData]:
-        """添加新节点"""
-        raise NotImplementedError
-        
-    def remove_node(self, node_id: str) -> bool:
-        """删除节点"""
-        raise NotImplementedError
-        
-    def get_connections(self) -> List[ConnectionData]:
-        """获取所有连接"""
         raise NotImplementedError
         
     def add_connection(self, source_id: str, target_id: str) -> Optional[ConnectionData]:
