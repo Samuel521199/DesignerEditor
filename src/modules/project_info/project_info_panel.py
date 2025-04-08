@@ -19,8 +19,7 @@ class ProjectInfoPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setup_ui()
-        self.setup_styles()
-        self.setup_branch_icons()
+        self.setup_branch_icons()  # 先设置图标
         
     def setup_ui(self):
         """设置界面"""
@@ -42,23 +41,81 @@ class ProjectInfoPanel(QWidget):
         self.scene_root.setText(0, "场景")
         self.scene_root.setFlags(self.scene_root.flags() & ~Qt.ItemFlag.ItemIsEditable)
         
+        # 添加一些测试子节点
+        for i in range(3):
+            child = QTreeWidgetItem(self.basic_info_root)
+            child.setText(0, f"测试项 {i+1}")
+            
+        for i in range(2):
+            child = QTreeWidgetItem(self.scene_root)
+            child.setText(0, f"场景 {i+1}")
+        
         layout.addWidget(self.tree)
         self.setLayout(layout)
         
     def setup_branch_icons(self):
         """设置分支图标"""
-        icons = TreeResources.create_branch_icons()
-        self.tree.setStyleSheet("""
-            QTreeWidget::branch:has-children:!has-siblings:closed,
-            QTreeWidget::branch:closed:has-children:has-siblings {
-                image: none;
+        print("开始设置分支图标...")
+        self.icons = TreeResources.create_branch_icons()
+        
+        # 设置树形控件的展开/折叠图标
+        self.tree.setIndentation(20)
+        self.tree.setAnimated(True)
+        
+        # 为每个项目设置图标
+        print("设置根节点图标...")
+        self.basic_info_root.setIcon(0, self.icons['branch-closed'])
+        self.scene_root.setIcon(0, self.icons['branch-closed'])
+        
+        # 连接展开/折叠信号
+        self.tree.itemExpanded.connect(self.on_item_expanded)
+        self.tree.itemCollapsed.connect(self.on_item_collapsed)
+        
+        # 设置样式
+        style = """
+            QTreeWidget {
+                background-color: #2b2b2b;
+                color: #ffffff;
+                border: 1px solid #3b3b3b;
+                font-size: 12px;
+                outline: 0;
             }
             
-            QTreeWidget::branch:open:has-children:!has-siblings,
-            QTreeWidget::branch:open:has-children:has-siblings {
-                image: none;
+            QTreeWidget::item {
+                padding: 4px;
+                border-bottom: 1px solid #3b3b3b;
+                height: 20px;
             }
-        """)
+            
+            QTreeWidget::item:selected {
+                background-color: #3b3b3b;
+                color: #ffffff;
+            }
+            
+            QTreeWidget::item:hover {
+                background-color: #3b3b3b;
+            }
+            
+            QTreeWidget::branch {
+                background-color: transparent;
+            }
+        """
+        self.tree.setStyleSheet(style)
+        
+        # 设置字体
+        font = QFont("Microsoft YaHei", 9)
+        self.tree.setFont(font)
+        print("分支图标设置完成")
+        
+    def on_item_expanded(self, item):
+        """项目展开时的处理"""
+        if item.childCount() > 0:
+            item.setIcon(0, self.icons['branch-open'])
+            
+    def on_item_collapsed(self, item):
+        """项目折叠时的处理"""
+        if item.childCount() > 0:
+            item.setIcon(0, self.icons['branch-closed'])
         
     def update_project_info(self, project_info: ProjectInfoModel):
         """更新项目信息"""
@@ -126,59 +183,4 @@ class ProjectInfoPanel(QWidget):
             audience_value.setText(0, audience)
         
         # 展开所有节点
-        self.tree.expandAll()
-        
-    def setup_styles(self):
-        """设置样式"""
-        self.setStyleSheet("""
-            QTreeWidget {
-                background-color: #2b2b2b;
-                color: #ffffff;
-                border: 1px solid #3b3b3b;
-                font-size: 12px;
-                outline: 0;
-            }
-            
-            QTreeWidget::item {
-                padding: 4px;
-                border-bottom: 1px solid #3b3b3b;
-                height: 20px;
-            }
-            
-            QTreeWidget::item:selected {
-                background-color: #3b3b3b;
-                color: #ffffff;
-            }
-            
-            QTreeWidget::item:hover {
-                background-color: #3b3b3b;
-            }
-            
-            QTreeWidget::branch {
-                background-color: #2b2b2b;
-            }
-            
-            QTreeWidget::branch:has-children:!has-siblings:closed,
-            QTreeWidget::branch:closed:has-children:has-siblings {
-                border-image: none;
-                image: url(:/icons/branch-closed.png);
-            }
-            
-            QTreeWidget::branch:open:has-children:!has-siblings,
-            QTreeWidget::branch:open:has-children:has-siblings {
-                border-image: none;
-                image: url(:/icons/branch-open.png);
-            }
-            
-            QTreeWidget::branch:has-siblings:!adjoins-item {
-                border-image: url(:/icons/branch-more.png) 0;
-            }
-            
-            QTreeWidget::branch:has-siblings:adjoins-item {
-                border-image: url(:/icons/branch-end.png) 0;
-            }
-        """)
-        
-        # 设置字体
-        font = QFont("Microsoft YaHei", 9)
-        self.tree.setFont(font) 
+        self.tree.expandAll() 
