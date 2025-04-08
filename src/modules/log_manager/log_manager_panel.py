@@ -7,7 +7,7 @@ This module implements the log manager panel.
 """
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QTextEdit,
-                           QHBoxLayout, QPushButton, QComboBox)
+                           QHBoxLayout, QPushButton, QComboBox, QLabel)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QTextCharFormat, QColor, QTextCursor
 
@@ -63,6 +63,10 @@ class LogManagerPanel(QWidget):
         self.add_log("加载项目文件", "info")
         self.add_log("无法找到资源文件", "warning")
         self.add_log("渲染错误", "error")
+        
+        # 临时标签
+        label = QLabel("日志管理面板")
+        main_layout.addWidget(label)
         
     def add_log(self, message, level="info"):
         """添加日志"""

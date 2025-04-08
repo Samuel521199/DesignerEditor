@@ -7,7 +7,7 @@ This module implements the AI assistant panel.
 """
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QTextEdit,
-                           QHBoxLayout, QPushButton, QLineEdit)
+                           QHBoxLayout, QPushButton, QLineEdit, QLabel)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QTextCharFormat, QColor, QTextCursor
 
@@ -19,10 +19,11 @@ class AIAssistantPanel(QWidget):
         
     def setup_ui(self):
         """设置用户界面"""
-        # 创建主布局
-        main_layout = QVBoxLayout(self)
-        main_layout.setSpacing(8)
-        main_layout.setContentsMargins(8, 8, 8, 8)
+        layout = QVBoxLayout()
+        
+        # 临时标签
+        label = QLabel("AI助理面板")
+        layout.addWidget(label)
         
         # 创建对话历史文本编辑器
         self.chat_history = QTextEdit()
@@ -60,11 +61,13 @@ class AIAssistantPanel(QWidget):
         input_layout.addWidget(clear_button)
         
         # 将组件添加到主布局
-        main_layout.addWidget(self.chat_history)
-        main_layout.addLayout(input_layout)
+        layout.addWidget(self.chat_history)
+        layout.addLayout(input_layout)
         
         # 添加欢迎消息
         self.add_message("AI助理", "您好！我是您的AI助理，有什么可以帮您的吗？")
+        
+        self.setLayout(layout)
         
     def send_message(self):
         """发送消息"""

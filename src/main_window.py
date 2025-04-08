@@ -43,9 +43,6 @@ class MainWindow(QMainWindow):
         # 设置样式
         self.setup_styles()
         
-        # 连接菜单信号
-        self.connect_menu_signals()
-        
     def setup_panels(self):
         """设置各个面板"""
         # 项目信息面板（左上）
@@ -169,46 +166,3 @@ class MainWindow(QMainWindow):
                 selection-background-color: #3d3d3d;
             }
         """)
-        
-    def connect_menu_signals(self):
-        """连接菜单信号"""
-        # 视图菜单
-        self.menu_bar.view_menu.actions()[0].triggered.connect(
-            lambda: self.toggle_dock_widget(self.project_info_dock))
-        self.menu_bar.view_menu.actions()[1].triggered.connect(
-            lambda: self.toggle_dock_widget(self.scene_editor_dock))
-        self.menu_bar.view_menu.actions()[2].triggered.connect(
-            lambda: self.toggle_dock_widget(self.log_manager_dock))
-        self.menu_bar.view_menu.actions()[3].triggered.connect(
-            lambda: self.toggle_dock_widget(self.ai_assistant_dock))
-            
-        # 文件菜单
-        self.menu_bar.file_menu.actions()[0].triggered.connect(self.new_project)
-        self.menu_bar.file_menu.actions()[1].triggered.connect(self.open_project)
-        self.menu_bar.file_menu.actions()[2].triggered.connect(self.save_project)
-        self.menu_bar.file_menu.actions()[3].triggered.connect(self.save_project_as)
-        self.menu_bar.file_menu.actions()[5].triggered.connect(self.close)
-        
-    def toggle_dock_widget(self, dock_widget: QDockWidget):
-        """切换面板显示状态"""
-        dock_widget.setVisible(not dock_widget.isVisible())
-        
-    def new_project(self):
-        """新建项目"""
-        # TODO: 实现新建项目功能
-        pass
-        
-    def open_project(self):
-        """打开项目"""
-        # TODO: 实现打开项目功能
-        pass
-        
-    def save_project(self):
-        """保存项目"""
-        # TODO: 实现保存项目功能
-        pass
-        
-    def save_project_as(self):
-        """另存为项目"""
-        # TODO: 实现另存为项目功能
-        pass
