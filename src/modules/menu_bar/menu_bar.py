@@ -2,27 +2,31 @@
 Menu Bar Module
 菜单栏模块
 
-This module implements the main menu bar functionality.
-此模块实现主菜单栏功能。
+This module provides the main menu bar functionality.
+此模块提供主菜单栏功能。
 """
 
-from PyQt6.QtWidgets import QMenuBar, QMenu, QDialog
+from PyQt6.QtWidgets import QMenuBar, QMenu, QFileDialog, QMessageBox
+from PyQt6.QtGui import QIcon, QAction
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction
 from .new_project_dialog import NewProjectDialog
-from ..file_manager.file_manager import FileManager
+from ..file_manager.api import FileManagerAPI
+from ..project_model.project_info_model import ProjectInfoModel
+from ..message_box.api import MessageBoxAPI
 
 class MenuBar(QMenuBar):
     """主菜单栏类"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.file_manager = FileManager()
+        self.file_manager = FileManagerAPI()
+        self.current_project: ProjectInfoModel = None
+        self.message_box_api = MessageBoxAPI()
         self.setup_ui()
         self.setup_styles()
     
     def setup_ui(self):
-        """设置界面"""
+        """设置菜单栏界面"""
         # 文件菜单
         file_menu = self.addMenu("文件")
         
@@ -31,19 +35,19 @@ class MenuBar(QMenuBar):
         new_project_action.triggered.connect(self.show_new_project_dialog)
         file_menu.addAction(new_project_action)
         
-        # 打开
-        open_action = QAction("打开", self)
-        open_action.triggered.connect(self.open_project)
-        file_menu.addAction(open_action)
+        # 打开项目
+        open_project_action = QAction("打开项目", self)
+        open_project_action.triggered.connect(self.show_open_project_dialog)
+        file_menu.addAction(open_project_action)
         
-        # 保存
-        save_action = QAction("保存", self)
-        save_action.triggered.connect(self.save_project)
-        file_menu.addAction(save_action)
+        # 保存项目
+        save_project_action = QAction("保存项目", self)
+        save_project_action.triggered.connect(self.save_current_project)
+        file_menu.addAction(save_project_action)
         
         # 另存为
         save_as_action = QAction("另存为", self)
-        save_as_action.triggered.connect(self.save_project_as)
+        save_as_action.triggered.connect(self.show_save_as_dialog)
         file_menu.addAction(save_as_action)
         
         file_menu.addSeparator()
@@ -103,40 +107,130 @@ class MenuBar(QMenuBar):
         # 帮助菜单
         help_menu = self.addMenu("帮助")
         
-        # 帮助内容
-        help_content_action = QAction("帮助内容", self)
-        help_menu.addAction(help_content_action)
+        # 帮助
+        help_action = QAction("帮助", self)
+        help_action.triggered.connect(self.show_help)
+        help_menu.addAction(help_action)
         
         # 关于
         about_action = QAction("关于", self)
+        about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
     
     def show_new_project_dialog(self):
         """显示新建项目对话框"""
         dialog = NewProjectDialog(self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            project_info = dialog.get_project_info()
+        if dialog.exec() == NewProjectDialog.DialogCode.Accepted:
+            self.current_project = dialog.get_project_info()
             # 更新项目信息面板
             main_window = self.parent()
             if hasattr(main_window, 'project_info_panel'):
-                main_window.project_info_panel.update_project_info(project_info)
-            # 保存项目
-            self.file_manager.save_project(project_info, "project.json")
+                main_window.project_info_panel.update_project_info(self.current_project)
+            # 提示用户保存项目
+            reply = QMessageBox.question(
+                self,
+                "保存项目",
+                "是否现在保存项目？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.show_save_as_dialog()
+            
+    def show_open_project_dialog(self):
+        """显示打开项目对话框"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "打开项目",
+            "",
+            "项目文件 (*.dep)"
+        )
+        
+        if file_path:
+            project_info = self.file_manager.load_project(file_path)
+            if project_info:
+                self.current_project = project_info
+                # 更新项目信息面板
+                main_window = self.parent()
+                if hasattr(main_window, 'project_info_panel'):
+                    main_window.project_info_panel.update_project_info(project_info)
+                QMessageBox.information(self, "成功", "项目加载成功！")
+            else:
+                QMessageBox.warning(self, "错误", "项目加载失败！")
+                
+    def save_current_project(self):
+        """保存当前项目"""
+        if not self.current_project:
+            QMessageBox.warning(self, "警告", "没有正在编辑的项目！")
+            return
+            
+        current_path = self.file_manager.get_project_directory()
+        if not current_path:
+            self.show_save_as_dialog()
+            return
+            
+        if self.file_manager.save_project(self.current_project, current_path):
+            QMessageBox.information(self, "成功", "项目保存成功！")
+        else:
+            QMessageBox.warning(self, "错误", "项目保存失败！")
+            
+    def show_save_as_dialog(self):
+        """显示另存为对话框"""
+        if not self.current_project:
+            QMessageBox.warning(self, "警告", "没有正在编辑的项目！")
+            return
+            
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "保存项目",
+            "",
+            "项目文件 (*.dep)"
+        )
+        
+        if file_path:
+            if self.file_manager.save_project(self.current_project, file_path):
+                QMessageBox.information(self, "成功", "项目保存成功！")
+            else:
+                QMessageBox.warning(self, "错误", "项目保存失败！")
     
-    def open_project(self):
-        """打开项目"""
-        # TODO: 实现打开项目功能
-        pass
-    
-    def save_project(self):
-        """保存项目"""
-        # TODO: 实现保存项目功能
-        pass
-    
-    def save_project_as(self):
-        """另存为项目"""
-        # TODO: 实现另存为项目功能
-        pass
+    def show_help(self):
+        help_text = """
+        DesignerEditor 帮助信息
+
+        主要功能：
+        1. 项目管理
+           - 新建项目
+           - 打开项目
+           - 保存项目
+
+        2. 场景管理
+           - 创建场景
+           - 编辑场景
+           - 删除场景
+
+        3. 公式管理
+           - 创建公式
+           - 编辑公式
+           - 删除公式
+
+        4. 资源管理
+           - 添加资源
+           - 编辑资源
+           - 删除资源
+
+        更多功能正在开发中...
+        """
+        self.message_box_api.show_message("帮助", help_text)
+
+    def show_about(self):
+        about_text = """
+        DesignerEditor v0.10
+
+        作者：Samuel-Jiang
+        日期：2024-03-21
+
+        一个用于游戏设计的编辑器工具。
+        """
+        self.message_box_api.show_message("关于", about_text)
     
     def setup_styles(self):
         """设置样式"""

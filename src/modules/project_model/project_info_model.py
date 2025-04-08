@@ -86,11 +86,11 @@ class ProjectInfoModel:
         return {
             "name": self.name,
             "description": self.description,
-            "game_type": self.game_type.value if self.game_type else None,
-            "target_platforms": [platform.value for platform in self.target_platforms],
-            "game_style": self.game_style.value if self.game_style else None,
-            "time_setting": self.time_setting.value if self.time_setting else None,
-            "target_audience": self.target_audience.value if self.target_audience else None
+            "game_type": self.game_type.name if self.game_type else None,
+            "target_platforms": [platform.name for platform in self.target_platforms],
+            "game_style": self.game_style.name if self.game_style else None,
+            "time_setting": self.time_setting.name if self.time_setting else None,
+            "target_audience": [audience.name for audience in self.target_audience] if self.target_audience else None
         }
     
     @classmethod

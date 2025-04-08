@@ -1,6 +1,7 @@
 """信息窗口模块API"""
 from enum import Enum
 from typing import Optional, Callable
+from PyQt6.QtCore import Qt
 
 class MessageType(Enum):
     """消息类型"""
@@ -18,7 +19,8 @@ class MessageBoxAPI:
         """显示消息"""
         from .widget import MessageBoxWidget
         widget = MessageBoxWidget(title, message, message_type, callback)
-        widget.show()
+        widget.setWindowModality(Qt.WindowModality.ApplicationModal)
+        widget.exec()
         
     @staticmethod
     def show_question(title: str, message: str, 
@@ -29,4 +31,5 @@ class MessageBoxAPI:
         widget = MessageBoxWidget(title, message, MessageType.QUESTION, 
                                 confirm_callback=confirm_callback,
                                 cancel_callback=cancel_callback)
-        widget.show() 
+        widget.setWindowModality(Qt.WindowModality.ApplicationModal)
+        widget.exec() 

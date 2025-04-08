@@ -49,7 +49,8 @@ class NewProjectDialog(QDialog):
         type_layout = QHBoxLayout()
         type_label = QLabel("游戏类型:")
         self.type_combo = QComboBox()
-        self.type_combo.addItems([t.value for t in GameType])
+        for game_type in GameType:
+            self.type_combo.addItem(game_type.value, game_type.name)
         type_layout.addWidget(type_label)
         type_layout.addWidget(self.type_combo)
         layout.addLayout(type_layout)
@@ -61,6 +62,7 @@ class NewProjectDialog(QDialog):
         self.platform_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
         for platform in TargetPlatform:
             item = QListWidgetItem(platform.value)
+            item.setData(Qt.ItemDataRole.UserRole, platform.name)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(Qt.CheckState.Unchecked)
             self.platform_list.addItem(item)
@@ -72,7 +74,8 @@ class NewProjectDialog(QDialog):
         style_layout = QHBoxLayout()
         style_label = QLabel("游戏风格:")
         self.style_combo = QComboBox()
-        self.style_combo.addItems([s.value for s in GameStyle])
+        for game_style in GameStyle:
+            self.style_combo.addItem(game_style.value, game_style.name)
         style_layout.addWidget(style_label)
         style_layout.addWidget(self.style_combo)
         layout.addLayout(style_layout)
@@ -81,7 +84,8 @@ class NewProjectDialog(QDialog):
         time_layout = QHBoxLayout()
         time_label = QLabel("时代背景:")
         self.time_combo = QComboBox()
-        self.time_combo.addItems([t.value for t in TimeSetting])
+        for time_setting in TimeSetting:
+            self.time_combo.addItem(time_setting.value, time_setting.name)
         time_layout.addWidget(time_label)
         time_layout.addWidget(self.time_combo)
         layout.addLayout(time_layout)
@@ -93,6 +97,7 @@ class NewProjectDialog(QDialog):
         self.audience_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
         for audience in TargetAudience:
             item = QListWidgetItem(audience.value)
+            item.setData(Qt.ItemDataRole.UserRole, audience.name)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(Qt.CheckState.Unchecked)
             self.audience_list.addItem(item)
@@ -119,25 +124,25 @@ class NewProjectDialog(QDialog):
         for i in range(self.platform_list.count()):
             item = self.platform_list.item(i)
             if item.checkState() == Qt.CheckState.Checked:
-                platform_value = item.text()
-                selected_platforms.append(TargetPlatform(platform_value))
+                platform_name = item.data(Qt.ItemDataRole.UserRole)
+                selected_platforms.append(TargetPlatform[platform_name])
         
         # 获取选中的受众
         selected_audiences = []
         for i in range(self.audience_list.count()):
             item = self.audience_list.item(i)
             if item.checkState() == Qt.CheckState.Checked:
-                audience_value = item.text()
-                selected_audiences.append(TargetAudience(audience_value))
+                audience_name = item.data(Qt.ItemDataRole.UserRole)
+                selected_audiences.append(TargetAudience[audience_name])
         
         # 创建项目信息模型
         project_info = ProjectInfoModel(
             name=self.name_edit.text(),
             description=self.desc_edit.toPlainText(),
-            game_type=GameType(self.type_combo.currentText()),
+            game_type=GameType[self.type_combo.currentData()],
             target_platforms=selected_platforms,
-            game_style=GameStyle(self.style_combo.currentText()),
-            time_setting=TimeSetting(self.time_combo.currentText()),
+            game_style=GameStyle[self.style_combo.currentData()],
+            time_setting=TimeSetting[self.time_combo.currentData()],
             target_audience=selected_audiences
         )
         
