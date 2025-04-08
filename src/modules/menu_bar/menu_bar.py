@@ -10,12 +10,14 @@ from PyQt6.QtWidgets import QMenuBar, QMenu, QDialog
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
 from .new_project_dialog import NewProjectDialog
+from ..file_manager.file_manager import FileManager
 
 class MenuBar(QMenuBar):
     """主菜单栏类"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.file_manager = FileManager()
         self.setup_ui()
         self.setup_styles()
     
@@ -31,14 +33,17 @@ class MenuBar(QMenuBar):
         
         # 打开
         open_action = QAction("打开", self)
+        open_action.triggered.connect(self.open_project)
         file_menu.addAction(open_action)
         
         # 保存
         save_action = QAction("保存", self)
+        save_action.triggered.connect(self.save_project)
         file_menu.addAction(save_action)
         
         # 另存为
         save_as_action = QAction("另存为", self)
+        save_as_action.triggered.connect(self.save_project_as)
         file_menu.addAction(save_as_action)
         
         file_menu.addSeparator()
@@ -111,7 +116,27 @@ class MenuBar(QMenuBar):
         dialog = NewProjectDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             project_info = dialog.get_project_info()
-            print("新建项目信息:", project_info)
+            # 更新项目信息面板
+            main_window = self.parent()
+            if hasattr(main_window, 'project_info_panel'):
+                main_window.project_info_panel.update_project_info(project_info)
+            # 保存项目
+            self.file_manager.save_project(project_info, "project.json")
+    
+    def open_project(self):
+        """打开项目"""
+        # TODO: 实现打开项目功能
+        pass
+    
+    def save_project(self):
+        """保存项目"""
+        # TODO: 实现保存项目功能
+        pass
+    
+    def save_project_as(self):
+        """另存为项目"""
+        # TODO: 实现另存为项目功能
+        pass
     
     def setup_styles(self):
         """设置样式"""
