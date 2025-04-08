@@ -3,10 +3,13 @@ import logging
 import os
 from PyQt6.QtWidgets import QApplication
 
-# 添加项目根目录到Python路径
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 添加项目根目录和src目录到Python路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+src_dir = os.path.join(current_dir, "src")
+sys.path.insert(0, current_dir)
+sys.path.insert(0, src_dir)
 
-from DesignerEditor.src.main_window import MainWindow
+from src.main_window import MainWindow
 
 def main():
     """应用程序入口"""

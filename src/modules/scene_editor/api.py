@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 import json
 import os
+from PyQt6.QtWidgets import QDockWidget
+from .scene_editor_panel import SceneEditorPanel
 
 class NodeType(Enum):
     """Scene node type enumeration."""
@@ -227,4 +229,17 @@ class SceneEditorAPI:
         
     def update_node_properties(self, node_id: str, properties: Dict[str, str]) -> bool:
         """更新节点属性"""
-        raise NotImplementedError 
+        raise NotImplementedError
+
+    @staticmethod
+    def create_scene_editor() -> QDockWidget:
+        """创建场景编辑器面板"""
+        dock = QDockWidget("场景编辑器")
+        editor = SceneEditorPanel()
+        dock.setWidget(editor)
+        dock.setFeatures(
+            QDockWidget.DockWidgetFeature.DockWidgetClosable |
+            QDockWidget.DockWidgetFeature.DockWidgetMovable |
+            QDockWidget.DockWidgetFeature.DockWidgetFloatable
+        )
+        return dock 
