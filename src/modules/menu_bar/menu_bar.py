@@ -8,11 +8,15 @@ This module provides the main menu bar functionality.
 
 from PyQt6.QtWidgets import QMenuBar, QMenu, QFileDialog, QMessageBox
 from PyQt6.QtGui import QIcon, QAction
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from .new_project_dialog import NewProjectDialog
 from ..file_manager.api import FileManagerAPI
 from ..project_model.project_info_model import ProjectInfoModel
 from ..message_box.api import MessageBoxAPI
+from ..project_info.api import ProjectInfoAPI
+from ..log_manager.api import LogManagerAPI
+from ..scene_editor.api import SceneEditorAPI
+from ..ai_assistant.api import AIAssistantAPI
 
 class MenuBar(QMenuBar):
     """主菜单栏类"""
@@ -90,12 +94,62 @@ class MenuBar(QMenuBar):
         toolbar_action.setCheckable(True)
         toolbar_action.setChecked(True)
         view_menu.addAction(toolbar_action)
+
+        # 视图内增加四个窗口的开关API
+        self.project_info_window_action = QAction("项目信息", self)
+        self.log_manager_window_action = QAction("日志管理", self)
+        self.scene_editor_window_action = QAction("场景编辑", self)
+        self.ai_assistant_window_action = QAction("AI助手", self)
+        
+        # 设置窗口动作为可选中，并默认选中
+        self.project_info_window_action.setCheckable(True)
+        self.log_manager_window_action.setCheckable(True)
+        self.scene_editor_window_action.setCheckable(True)
+        self.ai_assistant_window_action.setCheckable(True)
+        
+        # 设置初始状态为选中
+        self.project_info_window_action.setChecked(True)
+        self.log_manager_window_action.setChecked(True)
+        self.scene_editor_window_action.setChecked(True)
+        self.ai_assistant_window_action.setChecked(True)
+        
+        # 添加四个窗口的开关API
+        view_menu.addAction(self.project_info_window_action)
+        view_menu.addAction(self.log_manager_window_action)
+        view_menu.addAction(self.scene_editor_window_action)
+        view_menu.addAction(self.ai_assistant_window_action)
+
+        # 每个窗口的开关API的调用
+        self.project_info_window_action.triggered.connect(
+            lambda checked: self.parent().get_project_info_dock().setVisible(checked)
+        )
+        self.log_manager_window_action.triggered.connect(
+            lambda checked: self.parent().get_log_dock().setVisible(checked)
+        )
+        self.scene_editor_window_action.triggered.connect(
+            lambda checked: self.parent().get_scene_editor().setVisible(checked)
+        )
+        self.ai_assistant_window_action.triggered.connect(
+            lambda checked: self.parent().get_assistant_dock().setVisible(checked)
+        )
+        
+        # 初始化窗口状态
+        ProjectInfoAPI.get_instance().show_panel()
+        LogManagerAPI.get_instance().show_panel()
+        SceneEditorAPI.get_instance().show_panel()
+        AIAssistantAPI.get_instance().show_panel()
         
         # 状态栏
         statusbar_action = QAction("状态栏", self)
         statusbar_action.setCheckable(True)
         statusbar_action.setChecked(True)
         view_menu.addAction(statusbar_action)
+        
+        # 添加默认布局选项
+        view_menu.addSeparator()
+        default_layout_action = QAction("默认布局", self)
+        default_layout_action.triggered.connect(self.restore_default_layout)
+        view_menu.addAction(default_layout_action)
         
         # 工具菜单
         tools_menu = self.addMenu("工具")
@@ -272,3 +326,94 @@ class MenuBar(QMenuBar):
                 margin: 4px 0;
             }
         """) 
+
+    def restore_default_layout(self):
+        """恢复默认布局"""
+        main_window = self.parent()
+        
+        # 确保所有面板都可见
+        self.project_info_window_action.setChecked(True)
+        self.log_manager_window_action.setChecked(True)
+        self.scene_editor_window_action.setChecked(True)
+        self.ai_assistant_window_action.setChecked(True)
+        
+        # 显示所有面板
+        ProjectInfoAPI.get_instance().show_panel()
+        LogManagerAPI.get_instance().show_panel()
+        SceneEditorAPI.get_instance().show_panel()
+        AIAssistantAPI.get_instance().show_panel()
+        
+        # 1. 先移除所有dock widgets
+        if hasattr(main_window, 'get_project_info_dock'):
+            main_window.removeDockWidget(main_window.get_project_info_dock())
+        if hasattr(main_window, 'get_assistant_dock'):
+            main_window.removeDockWidget(main_window.get_assistant_dock())
+        if hasattr(main_window, 'get_log_dock'):
+            main_window.removeDockWidget(main_window.get_log_dock())
+            
+        # 2. 确保场景编辑器作为中央部件
+        if hasattr(main_window, 'get_scene_editor'):
+            scene_editor = main_window.get_scene_editor()
+            main_window.setCentralWidget(scene_editor)
+        
+        # 3. 重新添加左侧项目信息面板
+        if hasattr(main_window, 'get_project_info_dock'):
+            project_info_dock = main_window.get_project_info_dock()
+            project_info_dock.setVisible(True)
+            project_info_dock.setFloating(False)  # 确保不是浮动状态
+            main_window.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, project_info_dock)
+            
+            # 设置固定宽度
+            width = int(main_window.width() * 0.2)
+            project_info_dock.setMinimumWidth(width)
+            project_info_dock.setMaximumWidth(width)
+            main_window.resizeDocks([project_info_dock], [width], Qt.Orientation.Horizontal)
+        
+        # 4. 重新添加右侧AI助手面板
+        if hasattr(main_window, 'get_assistant_dock'):
+            assistant_dock = main_window.get_assistant_dock()
+            assistant_dock.setVisible(True)
+            assistant_dock.setFloating(False)  # 确保不是浮动状态
+            main_window.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, assistant_dock)
+            
+            # 设置固定宽度
+            width = int(main_window.width() * 0.2)
+            assistant_dock.setMinimumWidth(width)
+            assistant_dock.setMaximumWidth(width)
+            main_window.resizeDocks([assistant_dock], [width], Qt.Orientation.Horizontal)
+        
+        # 5. 重新添加底部日志面板
+        if hasattr(main_window, 'get_log_dock'):
+            log_dock = main_window.get_log_dock()
+            log_dock.setVisible(True)
+            log_dock.setFloating(False)  # 确保不是浮动状态
+            main_window.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, log_dock)
+            
+            # 设置固定高度
+            height = int(main_window.height() * 0.2)
+            log_dock.setMinimumHeight(height)
+            log_dock.setMaximumHeight(height)
+            main_window.resizeDocks([log_dock], [height], Qt.Orientation.Vertical)
+        
+        # 6. 强制更新布局
+        main_window.update()
+        
+        # 7. 延迟一帧后重置最大最小值，允许用户调整大小
+        QTimer.singleShot(0, lambda: self._reset_dock_constraints(main_window))
+    
+    def _reset_dock_constraints(self, main_window):
+        """重置dock widgets的大小限制"""
+        if hasattr(main_window, 'get_project_info_dock'):
+            dock = main_window.get_project_info_dock()
+            dock.setMinimumWidth(100)
+            dock.setMaximumWidth(int(main_window.width() * 0.4))
+            
+        if hasattr(main_window, 'get_assistant_dock'):
+            dock = main_window.get_assistant_dock()
+            dock.setMinimumWidth(100)
+            dock.setMaximumWidth(int(main_window.width() * 0.4))
+            
+        if hasattr(main_window, 'get_log_dock'):
+            dock = main_window.get_log_dock()
+            dock.setMinimumHeight(50)
+            dock.setMaximumHeight(int(main_window.height() * 0.4)) 

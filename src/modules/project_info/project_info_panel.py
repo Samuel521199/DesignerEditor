@@ -12,6 +12,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QPainter, QIcon, QPixmap
 from ..project_model.project_info_model import ProjectInfoModel
 from .tree_resources import TreeResources
+from .api import ProjectInfoAPI
 
 class ProjectInfoPanel(QDockWidget):
     """项目信息面板类"""
@@ -19,6 +20,7 @@ class ProjectInfoPanel(QDockWidget):
     def __init__(self, parent=None):
         super().__init__("", parent)
         self.setObjectName("ProjectInfoPanel")
+        self.api = ProjectInfoAPI.get_instance()
         self.setup_ui()
         self.current_project = None
         

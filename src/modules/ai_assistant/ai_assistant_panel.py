@@ -10,11 +10,13 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QTextEdit,
                            QHBoxLayout, QPushButton, QLineEdit, QLabel)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QTextCharFormat, QColor, QTextCursor
+from .api import AIAssistantAPI, AssistantType
 
 class AIAssistantPanel(QWidget):
     """AI助理面板类"""
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.api = AIAssistantAPI.get_instance()
         self.setup_ui()
         
     def setup_ui(self):
@@ -75,8 +77,9 @@ class AIAssistantPanel(QWidget):
         if message:
             self.add_message("用户", message)
             self.input_edit.clear()
-            # TODO: 实现AI响应逻辑
-            self.add_message("AI助理", "收到您的消息，我会尽快回复。")
+            # 使用API生成响应
+            response = self.api.generate_response(message, AssistantType.QA)
+            self.add_message("AI助理", response)
             
     def clear_history(self):
         """清除历史记录"""

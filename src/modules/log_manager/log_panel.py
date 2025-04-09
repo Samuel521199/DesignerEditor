@@ -18,7 +18,7 @@ class LogPanel(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.api = LogManagerAPI()
+        self.api = LogManagerAPI.get_instance()
         self.setup_ui()
         self.setup_formats()
         self.setup_connections()

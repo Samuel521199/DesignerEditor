@@ -121,16 +121,52 @@ class SceneProject:
             return False
 
 class ProjectInfoAPI:
-    """项目信息API"""
-    
-    _current_project: Optional[SceneProject] = None
+    """项目信息模块API"""
+    _instance = None
     
     @classmethod
-    def get_current_project(cls) -> Optional[SceneProject]:
-        """获取当前项目"""
-        return cls._current_project
+    def get_instance(cls) -> 'ProjectInfoAPI':
+        """获取单例实例"""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
         
-    @classmethod
-    def set_current_project(cls, project: SceneProject) -> None:
-        """设置当前项目"""
-        cls._current_project = project 
+    def __init__(self):
+        """初始化"""
+        if ProjectInfoAPI._instance is not None:
+            raise Exception("This class is a singleton!")
+        ProjectInfoAPI._instance = self
+        self._current_project = None
+        self._panel = None
+        
+    def set_panel(self, panel):
+        """设置面板"""
+        self._panel = panel
+        
+    def get_panel(self):
+        """获取面板"""
+        return self._panel
+        
+    def show_panel(self):
+        """显示面板"""
+        if self._panel:
+            self._panel.show()
+            
+    def hide_panel(self):
+        """隐藏面板"""
+        if self._panel:
+            self._panel.hide()
+            
+    def is_panel_visible(self) -> bool:
+        """检查面板是否可见"""
+        return self._panel.isVisible() if self._panel else False
+        
+    def toggle_project_info_window(self, is_open: bool = True) -> Optional[bool]:
+        """切换当前项目信息窗口的显示状态"""
+        if self._panel:
+            if is_open:
+                self.show_panel()
+            else:
+                self.hide_panel()
+            return True
+        return None

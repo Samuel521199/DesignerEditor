@@ -61,10 +61,55 @@ class ConnectionData:
 
 class SceneEditorAPI:
     """Scene editor API interface class."""
+    _instance = None
+    
+    @classmethod
+    def get_instance(cls) -> 'SceneEditorAPI':
+        """Get singleton instance."""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
     
     def __init__(self):
+        """Initialize the scene editor."""
+        if SceneEditorAPI._instance is not None:
+            raise Exception("This class is a singleton!")
+        SceneEditorAPI._instance = self
         self.current_scene: Optional[Scene] = None
         self.scene_changed_callbacks = []
+        self._panel = None
+        
+    def set_panel(self, panel):
+        """Set the scene editor panel."""
+        self._panel = panel
+        
+    def get_panel(self):
+        """Get the scene editor panel."""
+        return self._panel
+        
+    def show_panel(self):
+        """Show the scene editor panel."""
+        if self._panel:
+            self._panel.show()
+            
+    def hide_panel(self):
+        """Hide the scene editor panel."""
+        if self._panel:
+            self._panel.hide()
+            
+    def is_panel_visible(self) -> bool:
+        """Check if the scene editor panel is visible."""
+        return self._panel.isVisible() if self._panel else False
+        
+    def toggle_scene_editor_window(self, is_open: bool = True) -> Optional[bool]:
+        """Toggle the visibility of the scene editor window."""
+        if self._panel:
+            if is_open:
+                self.show_panel()
+            else:
+                self.hide_panel()
+            return True
+        return None
     
     def create_scene(self, name: str) -> Scene:
         """Create a new scene."""

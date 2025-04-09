@@ -30,11 +30,56 @@ class LogEntry:
 
 class LogManagerAPI:
     """Log manager API interface class."""
+    _instance = None
+    
+    @classmethod
+    def get_instance(cls) -> 'LogManagerAPI':
+        """Get singleton instance."""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
     
     def __init__(self):
+        """Initialize the log manager."""
+        if LogManagerAPI._instance is not None:
+            raise Exception("This class is a singleton!")
+        LogManagerAPI._instance = self
         self.entries: List[LogEntry] = []
         self.log_added_callbacks = []
         self.log_cleared_callbacks = []
+        self._panel = None
+    
+    def set_panel(self, panel):
+        """Set the log panel."""
+        self._panel = panel
+    
+    def get_panel(self):
+        """Get the log panel."""
+        return self._panel
+    
+    def show_panel(self):
+        """Show the log panel."""
+        if self._panel:
+            self._panel.show()
+    
+    def hide_panel(self):
+        """Hide the log panel."""
+        if self._panel:
+            self._panel.hide()
+    
+    def is_panel_visible(self) -> bool:
+        """Check if the log panel is visible."""
+        return self._panel.isVisible() if self._panel else False
+    
+    def toggle_log_manager_window(self, is_open: bool = True) -> Optional[bool]:
+        """Toggle the visibility of the log manager window."""
+        if self._panel:
+            if is_open:
+                self.show_panel()
+            else:
+                self.hide_panel()
+            return True
+        return None
     
     def add_entry(self, level: LogLevel, message: str,
                  source: str = "", details: Dict[str, Any] = None) -> LogEntry:
