@@ -13,6 +13,7 @@ from PyQt6.QtGui import QFont, QPainter, QIcon, QPixmap
 from ..project_model.project_info_model import ProjectInfoModel
 from .tree_resources import TreeResources
 from .api import ProjectInfoAPI
+from .create_scene_panel import CreateScenePanel
 
 class ProjectInfoPanel(QDockWidget):
     """项目信息面板类"""
@@ -67,6 +68,12 @@ class ProjectInfoPanel(QDockWidget):
         self.scenes_root = QTreeWidgetItem(self.root)
         self.scenes_root.setText(0, "场景")
         self.scenes_root.setIcon(0, TreeResources.get_folder_icon())
+        
+        # 在场景节点下右键添加场景面板
+        self.create_scene_panel = CreateScenePanel()
+        # 设置树形控件的上下文菜单策略
+        self.tree_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tree_widget.customContextMenuRequested.connect(self.show_context_menu)
         
         # 展开根节点
         self.root.setExpanded(True)
@@ -128,4 +135,10 @@ class ProjectInfoPanel(QDockWidget):
             # 展开所有节点
             self.root.setExpanded(True)
             self.basic_info_root.setExpanded(True)
-            self.scenes_root.setExpanded(True) 
+            self.scenes_root.setExpanded(True)
+        
+    def show_context_menu(self, position):
+        """显示上下文菜单"""
+        item = self.tree_widget.itemAt(position)
+        if item == self.scenes_root:
+            self.create_scene_panel.menu.exec(self.tree_widget.mapToGlobal(position)) 

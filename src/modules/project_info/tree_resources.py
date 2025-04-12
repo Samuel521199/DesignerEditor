@@ -185,3 +185,5 @@ class TreeResources:
         painter.end()
         icon.addPixmap(pixmap)
         return icon 
+    
+    
